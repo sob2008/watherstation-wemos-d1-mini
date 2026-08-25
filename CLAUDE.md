@@ -4,29 +4,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Single-sketch Arduino project for a Wemos D1 Mini (ESP8266) weather station. It fetches current
-conditions and a 3-day forecast from the free Open-Meteo API and renders them on SPI SH1106 OLED
-displays (128x64). All logic — WiFi provisioning, HTTPS fetch/JSON parsing, and display rendering —
-lives in one `.ino` file; there is no separate library/module structure.
+Arduino project for a Wemos D1 Mini (ESP8266) weather station. It fetches current conditions and a
+3-day forecast from the free Open-Meteo API, renders them on two SPI SH1106 OLED displays (128x64),
+and can update its own firmware over the air (OTA) from GitHub Releases. All application logic lives in
+`wather-station-2dis/wather-station-2dis.ino`; the OTA subsystem lives in a handful of sibling
+`.h`/`.cpp` files in the same folder (Arduino compiles every `.h`/`.cpp` in the sketch folder together
+with the `.ino`, so this is a normal multi-file sketch, not a separate library).
 
 The repo currently contains only the 2-display variant (`wather-station-2dis/`). `DOKUMENTACE.txt`
 (Czech-language docs) also describes a 1-display variant (`wather-station-1dis/wather-station-1dis.ino`)
 that is not present in this checkout — don't assume it exists without checking.
 
-## Build / upload (Arduino IDE — no CLI build system)
+## Build / test commands
 
-There is no Makefile, CMake, or CLI build script; this is developed and flashed via the Arduino IDE.
+**Firmware (Arduino IDE or arduino-cli)** — no Makefile/CMake, this is a normal Arduino sketch:
 
-- Board: ESP8266 Boards -> "LOLIN(WEMOS) D1 R2 & mini" (FQBN `esp8266:esp8266:d1_mini`, per `build/esp8266.esp8266.d1_mini/`)
-- Required libraries (Arduino Library Manager): `U8g2`, `ArduinoJson`, `WiFiManager` (by tzapu), `NTPClient`
-- Serial Monitor: 115200 baud — used for all runtime diagnostics (WiFi connect, HTTP status, JSON errors)
-- There are no automated tests, linters, or CI in this repo. Verification is: compile in Arduino IDE,
-  flash to hardware, and observe the OLED output / Serial Monitor.
+- Board: ESP8266 Boards -> "LOLIN(WEMOS) D1 R2 & mini", FQBN `esp8266:esp8266:d1_mini`
+- Flash Size **must stay** `4MB (FS:2MB OTA:~1019KB)` (`eesz=4M2M`) — the OTA subsystem's size checks
+  are written against this exact layout (see `wather-station-2dis/OtaConfig.h` and README.md)
+- Required libraries: `U8g2`, `ArduinoJson` (v7 API), `WiFiManager` (tzapu), `NTPClient`
+- CLI compile: `arduino-cli compile --fqbn esp8266:esp8266:d1_mini --warnings all wather-station-2dis`
+- Serial Monitor: 115200 baud — all runtime diagnostics, OTA included, are logged with an `[OTA]` prefix
 
-## Architecture (`wather-station-2dis/wather-station-2dis.ino`)
+**Host-side unit tests** — the parts of the OTA subsystem with no Arduino/ESP8266 dependency
+(`Sha256`, `OtaVersion`) are deliberately written to compile with a plain host g++ and are tested
+outside the sketch folder in `tests/` (Arduino only compiles files inside the sketch's own folder, so
+this can't accidentally get picked up by the firmware build):
 
-**Location config** lives at the top of the file as plain constants (`LOCATION_NAME`, `LAT`, `LON`,
-`TIMEZONE`) — this is the only thing a user is expected to edit before flashing.
+```
+g++ -std=c++17 -Wall -Wextra -o test_sha256.exe tests/test_sha256.cpp wather-station-2dis/Sha256.cpp
+g++ -std=c++17 -Wall -Wextra -o test_ota_version.exe tests/test_ota_version.cpp wather-station-2dis/OtaVersion.cpp
+```
+
+The rest of the OTA code (`OtaState`, `OtaManager`) depends on LittleFS/HTTPClient/Update and is only
+verified by real compilation against the ESP8266 core, not host-executable — see README.md's "Testy"
+section for what has and hasn't been exercised on real hardware.
+
+**Release**: `scripts/release.ps1 -Version X.Y.Z` bumps `FIRMWARE_VERSION`, commits, tags, and (after
+confirmation) pushes — which triggers `.github/workflows/release.yml` to compile the firmware and
+publish it as a GitHub Release. See README.md for the full flow; this is the only CI in the repo and it
+only runs on an explicit `vX.Y.Z` tag push, never on a plain push to `main`.
+
+## Architecture
+
+### Weather station (`wather-station-2dis.ino`)
+
+**Location config** (`LOCATION_NAME`, `LAT`, `LON`, `TIMEZONE`) lives as plain constants near the top of
+the file. Together with `OtaConfig.h` (see below), these are the things a user is expected to edit
+before flashing.
 
 **Two independent SH1106 displays** driven over a shared software SPI bus (CLK=D5, DATA=D7, DC=D3),
 but each display has its **own CS and RESET pin** (disp1: CS=D2/RST=D1, disp2: CS=D6/RST=D4) — this is
@@ -34,15 +59,16 @@ a hardware requirement called out repeatedly in `DOKUMENTACE.txt` (a shared RESE
 second display dark). D8 (GPIO15) must never be used for these signals because of its pull-down resistor.
 
 **Data flow**: `updateWeather()` does a single HTTPS GET to `api.open-meteo.com` (insecure TLS via
-`BearSSL::WiFiClientSecure::setInsecure()`, no cert pinning), parses the response into global state
-(`currentTemp`, `weatherCode`, `humidity`, `windSpeed`, `windDir`, `precipProb`,
+`BearSSL::WiFiClientSecure::setInsecure()` — see "TLS" note below), parses the response into global
+state (`currentTemp`, `weatherCode`, `humidity`, `windSpeed`, `windDir`, `precipProb`,
 `forecast{Min,Max,Code,Precip,Wind}[2]`), and sets `dataValid`/`lastError`. All rendering functions read
 from this global state rather than being passed data directly.
 
 **Rendering** is split by display and by screen: `disp1_drawCurrent`/`disp1_drawForecast` and
 `disp2_drawDetails`/`disp2_drawForecast`. `loop()` toggles a `showForecast` flag every 8 seconds and
 redraws both displays each iteration (`clearBuffer()` -> draw -> `sendBuffer()`), so display code always
-assumes it's being called from a tight polling loop, not event-driven.
+assumes it's being called from a tight polling loop, not event-driven. `otaStatusCallback()` is the one
+other thing allowed to draw to `disp1`, used only while an OTA download/flash is actively in progress.
 
 **Weather icons** are hand-authored XBM bitmaps (`icon_*[] PROGMEM`, LSB-first) at 24x24 (main) and
 16x16 (small) for sun/partial-cloud/cloud/rain/snow/storm, plus small WiFi-signal-strength and
@@ -51,8 +77,42 @@ these bitmaps; `getWeatherStatus()`/`getWeatherShort()` map the same codes to Cz
 When adding support for a new weather code, update all four mapping functions together.
 
 **Timing model** (all in `loop()`, non-blocking, `millis()`-based): weather refetch every 15 min
-(900000 ms), screen swap every 8 s, plus a 100 ms delay per loop iteration. NTP/timezone sync
-(`configTime` with the POSIX TZ string, for automatic CEST/CET DST) happens once in `setup()`.
+(900000 ms), screen swap every 8 s, OTA check every 30 min (`OTA_CHECK_INTERVAL_MS`), plus a 100 ms
+delay per loop iteration. NTP/timezone sync (`configTime` with the POSIX TZ string, for automatic
+CEST/CET DST) happens once in `setup()`.
 
 **WiFi provisioning** uses `WiFiManager` with AP name `MeteoStation_AP` and a 180s config portal
 timeout; on failure the device shows an error on disp1 and calls `ESP.restart()`.
+
+### OTA subsystem (`Ota*.h/.cpp`, `Sha256.h/.cpp`)
+
+Firmware self-updates from GitHub Releases; GitHub Actions is only used to *build and publish* those
+releases (on a manually-pushed tag), never to push firmware to devices directly. Full behavioral spec —
+flash/partition sizing, TLS trade-off rationale, rollback mechanics, release asset format — is in
+README.md; this section is about where the code lives.
+
+- **`OtaConfig.h`** — every tunable in one place (`FIRMWARE_VERSION`, `FIRMWARE_TARGET`, `GITHUB_OWNER`/
+  `GITHUB_REPOSITORY`, intervals/timeouts, `OTA_REQUIRE_CHECKSUM`, `OTA_MAX_BOOT_ATTEMPTS`). No secrets.
+- **`Sha256.h/.cpp`** — standalone SHA-256 (FIPS 180-4), no Arduino dependency on purpose so it's
+  host-testable. Used to verify every downloaded firmware image against `firmware.json`/
+  `firmware.bin.sha256` before it's ever booted.
+- **`OtaVersion.h/.cpp`** — also Arduino-independent. Parses `vMAJOR.MINOR.PATCH` tags and compares them
+  **numerically** field-by-field (`1.10.0 > 1.9.0`), not lexicographically.
+- **`OtaState.h/.cpp`** — persistent state on LittleFS under `/ota/`: `state.json` (pending-validation
+  flag, boot-attempt counter, last-failed version — written temp-file-then-rename to survive power
+  loss mid-write), `candidate.bin` (firmware currently being validated), `last_good.bin` (last
+  known-good backup, promoted from `candidate.bin` only after a successful boot). This is the module to
+  read first when reasoning about rollback/boot-loop behavior.
+- **`OtaManager.h/.cpp`** — orchestration: `begin()` (boot-time rollback decision, called before WiFi
+  connects), `notifyApplicationHealthy()` (marks the running firmware validated), `handle()`
+  (interval-gated GitHub check + blocking download/flash/verify cycle, called from `loop()`).
+
+**ESP8266-specific caveat that shapes this whole module**: unlike ESP32, the ESP8266 Arduino core has no
+native A/B partition rollback — `Update`/eboot is a copy-based ping-pong scheme, not an instant boot-
+partition switch. `OtaState`'s LittleFS-backed backup/boot-attempt-counter is what actually implements
+rollback at the application level; don't assume ESP32 OTA idioms apply here. See README.md's "Flash a
+OTA oblasti" section before changing anything in `Update.begin()`/`Update.end()` call sites.
+
+**TLS**: all HTTPS in this project (weather API and OTA) uses `BearSSL::WiFiClientSecure::setInsecure()`
+— deliberate, not an oversight; see README.md's "Integrita firmware (SHA-256) a TLS" section before
+"fixing" this. SHA-256 verification is mandatory for OTA specifically to compensate.

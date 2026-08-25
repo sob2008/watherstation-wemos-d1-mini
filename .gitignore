@@ -1,0 +1,3 @@
+# Zkompilovane host-side testy (tests/*.cpp se kompiluji lokalne, binarky
+# se necommituji - viz README.md sekce "Testy").
+tests/*.exe

@@ -10,7 +10,7 @@
 
 // Zvysujte pri kazde zmene, kterou chcete distribuovat pres OTA.
 // Pouziva se Semantic Versioning (MAJOR.MINOR.PATCH), viz OtaVersion.h.
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.0.1"
 
 // Identifikuje HW/SW variantu tohoto firmware. OTA odmitne nainstalovat
 // release, jehoz firmware.json obsahuje jiny "target" (viz README, sekce
@@ -18,9 +18,8 @@
 #define FIRMWARE_TARGET "esp8266-d1mini-wather-station-2dis"
 
 // --- GitHub repozitar s Releases ---
-// TODO: pred prvnim pouzitim OTA vyplnte skutecny GitHub ucet/repozitar.
-#define GITHUB_OWNER "REPLACE_ME_GITHUB_OWNER"
-#define GITHUB_REPOSITORY "REPLACE_ME_GITHUB_REPOSITORY"
+#define GITHUB_OWNER "sob2008"
+#define GITHUB_REPOSITORY "watherstation-wemos-d1-mini"
 
 // Nazvy ocekavanych assetu v GitHub Release.
 // firmware.json je volitelny, ale doporuceny - pokud je pritomen, pouzije

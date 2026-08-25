@@ -9,7 +9,7 @@ viz níže.
 
 ## Vývoj
 
-Sketch se vyvíjí a nahrává přes Arduino IDE (žádný PlatformIO, žádné CI):
+Sketch se vyvíjí a nahrává přes Arduino IDE (žádný PlatformIO):
 
 - Deska: `Tools -> Board -> ESP8266 Boards -> LOLIN(WEMOS) D1 R2 & mini`
 - Flash Size: `4MB (FS:2MB OTA:~1019KB)` (`eesz=4M2M`) - **musí zůstat toto
@@ -25,10 +25,13 @@ Sketch se vyvíjí a nahrává přes Arduino IDE (žádný PlatformIO, žádné 
 Firmware si jednou za `OTA_CHECK_INTERVAL_MS` (výchozí 30 minut) sám ověří,
 jestli GitHub repozitář obsahuje novější kompatibilní Release. Pokud ano,
 stáhne `firmware.bin`, ověří jeho integritu (SHA-256), velikost a cílovou
-platformu, zapíše ho do volné OTA oblasti flash paměti a restartuje se. GitHub
-se používá **výhradně jako úložiště Releases** - žádné GitHub Actions,
-žádné automatické buildy ani tagování. Build, verzování a vytvoření Release je
-vždy ruční krok popsaný níže.
+platformu, zapíše ho do volné OTA oblasti flash paměti a restartuje se.
+
+Build a vytvoření Release zajišťuje GitHub Actions workflow
+([`.github/workflows/release.yml`](.github/workflows/release.yml)), ale
+spouští se **výhradně ručním pushnutím tagu** `vX.Y.Z` - žádný automatický
+build při běžném push do `main`, žádné automatické zvyšování verze ani
+automatické tagování. Podrobný postup níže.
 
 Zařízení funguje plně i bez internetu/GitHubu - OTA je jen doplňková funkce,
 nikdy není podmínkou pro boot ani běžný provoz.
@@ -65,8 +68,9 @@ projektu, dle Arduino IDE Flash Size `4MB (FS:2MB OTA:~1019KB)`:
 
 Tyto dvě ~1019KB oblasti fungují jako ping-pong: v jedné běží aktuální
 firmware, do druhé se zapisuje nový. **Maximální velikost `firmware.bin` je
-tedy 1 048 576 bajtů.** Aktuální firmware (s OTA modulem) má cca 512 KB, tj.
-zhruba 49 % této kapacity - je stále dost prostoru pro budoucí růst.
+tedy 1 048 576 bajtů.** Aktuální firmware (s OTA modulem) má cca 500 KB
+(511 940 B, ověřeno reálnou kompilací), tj. zhruba 49 % této kapacity - je
+stále dost prostoru pro budoucí růst.
 
 LittleFS (2 MB) se používá pro perzistentní stav OTA (viz níže) - žádná OTA
 akce filesystem nemaže ani needituje mimo vlastní `/ota/` adresář.
@@ -127,26 +131,54 @@ Pokud `firmware.json` v Release chybí, firmware se pokusí najít
 formát `sha256sum` - `hash  firmware.bin`). Kontrola cíle (target) bez
 `firmware.json` možná není - loguje se varování.
 
-### Ruční release workflow
+### Release workflow (automatizovaný přes GitHub Actions)
+
+Build i vytvoření Release zajišťuje [`.github/workflows/release.yml`](.github/workflows/release.yml).
+Spouští se **výhradně ručním pushnutím tagu** - žádný push do `main` ani jiná
+událost release nevytvoří.
+
+**Nejjednodušší způsob - jeden skript:**
+
+```powershell
+.\scripts\release.ps1 -Version 1.2.0
+```
+
+Skript ([`scripts/release.ps1`](scripts/release.ps1)) nastaví
+`FIRMWARE_VERSION` v `OtaConfig.h`, vytvoří commit a tag `v1.2.0`, ukáže
+shrnutí a před finálním `git push` se ještě zeptá na potvrzení. Po potvrzení
+už jen sleduješ záložku *Actions* na GitHubu - zbytek (kompilace, SHA-256,
+`firmware.json`, GitHub Release) udělá CI sám.
+
+**Co se děje na pozadí (pokud chcete kroky ručně, bez skriptu):**
 
 1. Upravit firmware.
 2. Zvýšit `FIRMWARE_VERSION` v `OtaConfig.h` (Semantic Versioning).
-3. Zkontrolovat, že projekt jde přeložit (Arduino IDE `Sketch -> Verify/Compile`,
-   nebo `arduino-cli compile --fqbn esp8266:esp8266:d1_mini wather-station-2dis`).
-4. V Arduino IDE: `Sketch -> Export compiled Binary` (nebo
-   `arduino-cli compile ... --export-binaries`) - vznikne `.bin` v `build/`.
-5. Přejmenovat/zkopírovat výsledek jako `firmware.bin`.
-6. Spočítat SHA-256, např.:
-   - Linux/macOS: `sha256sum firmware.bin`
-   - Windows PowerShell: `Get-FileHash firmware.bin -Algorithm SHA256`
-7. Vytvořit `firmware.json` (viz vzor výše) s aktuální verzí, `target`,
-   velikostí `firmware.bin` v bajtech a spočítaným SHA-256 (volitelně navíc
-   i `firmware.bin.sha256` jako fallback).
-8. Vytvořit GitHub Release s tagem `vX.Y.Z` (musí odpovídat kroku 2).
-9. Přidat assety: `firmware.bin`, `firmware.json` (příp. `firmware.bin.sha256`).
-10. Publikovat Release.
-11. Zařízení při nejbližší pravidelné kontrole (do `OTA_CHECK_INTERVAL_MS`)
-    novou verzi zjistí, ověří a nainstaluje automaticky.
+3. Commitnout a pushnout změnu do `main`.
+4. Vytvořit a pushnout tag **odpovídající `FIRMWARE_VERSION`** (workflow to
+   ověřuje a při neshodě selže, aniž by cokoliv publikoval):
+   ```
+   git tag v1.2.0
+   git push origin v1.2.0
+   ```
+5. GitHub Actions runner zkompiluje sketch přes `arduino-cli` proti stejné
+   desce (`esp8266:esp8266:d1_mini`) a stejným knihovnám jako lokální vývoj,
+   spočítá SHA-256, vygeneruje `firmware.json` + `firmware.bin.sha256` a
+   vytvoří GitHub Release s tagem `vX.Y.Z` a všemi třemi assety.
+6. Zařízení při nejbližší pravidelné kontrole (do `OTA_CHECK_INTERVAL_MS`)
+   novou verzi zjistí, ověří a nainstaluje automaticky.
+
+Pokud kompilace selže nebo verze v tagu nesouhlasí s `FIRMWARE_VERSION`,
+workflow skončí chybou a **žádný Release nevznikne** - není možné omylem
+publikovat nezkompilovatelný nebo špatně označený firmware. Krok 1 (úprava
+firmware) skript samozřejmě neumí - to je jediná ruční část, která zbývá.
+
+**Ruční alternativa** (bez CI, např. pro lokální testování před tagem):
+zkompilovat (`arduino-cli compile --fqbn esp8266:esp8266:d1_mini
+wather-station-2dis --export-binaries` nebo Arduino IDE `Sketch -> Export
+compiled Binary`), výsledný `.bin` přejmenovat na `firmware.bin`, spočítat
+SHA-256 (`sha256sum firmware.bin` / `Get-FileHash -Algorithm SHA256`), ručně
+sestavit `firmware.json` dle vzoru výše a přidat všechny tři soubory jako
+assety k ručně vytvořenému Release.
 
 ### Kontrola velikosti
 
@@ -280,11 +312,14 @@ Logika, která nezávisí na Arduino/ESP8266 API (SHA-256, porovnávání verzí
 je pokrytá host-side testy mimo sketch, spustitelnými běžným g++:
 
 ```
-g++ -std=c++17 -o test_sha256.exe tests/test_sha256.cpp wather-station-2dis/Sha256.cpp
-g++ -std=c++17 -o test_ota_version.exe tests/test_ota_version.cpp wather-station-2dis/OtaVersion.cpp
+g++ -std=c++17 -Wall -Wextra -o test_sha256.exe tests/test_sha256.cpp wather-station-2dis/Sha256.cpp
+g++ -std=c++17 -Wall -Wextra -o test_ota_version.exe tests/test_ota_version.cpp wather-station-2dis/OtaVersion.cpp
 ```
 
-Zbytek OTA modulů (LittleFS, HTTPClient, Update) je ověřen reálnou kompilací
-proti ESP8266 core přes `arduino-cli compile --fqbn esp8266:esp8266:d1_mini
-wather-station-2dis` - běh na skutečném hardwaru ověřen nebyl (viz závěrečný
-report v historii konverzace/PR popisu pro detaily, co je a není ověřeno).
+Zbytek OTA modulů (`OtaState`, `OtaManager` - LittleFS, HTTPClient, Update)
+závisí na ESP8266 core a je ověřen reálnou kompilací (`arduino-cli compile
+--fqbn esp8266:esp8266:d1_mini --warnings all wather-station-2dis`, 0 chyb,
+0 varování), ne spuštěním. **Co nebylo a nemůže být ověřeno bez fyzického
+zařízení**: skutečný WiFi/HTTPS provoz, reálný eboot swap při restartu,
+chování watchdogu při dlouhém stahování, a celý rollback cyklus (vyžaduje
+záměrně vadný Release a sledování chování přes několik rebootů).

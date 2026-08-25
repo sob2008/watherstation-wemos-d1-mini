@@ -49,7 +49,9 @@ bool writeStateToDisk() {
 
   // Zapis nejdriv do docasneho souboru a az pak prejmenovat - vypadek
   // napajeni behem serializeJson() tak necha puvodni state.json netknuty.
-  LittleFS.remove(kStatePath);
+  // LittleFS.rename() cilovy soubor pokud existuje atomicky prepise sam
+  // (viz lfs_rename), takze se NEMAZE predem - kdybychom ho smazali a
+  // rename pak selhal, zustali bychom bez jakehokoliv state.json.
   if (!LittleFS.rename(kStateTmpPath, kStatePath)) {
     Serial.println("[OTA] ERROR: state rename failed");
     return false;
@@ -132,7 +134,7 @@ void beginPendingValidation(const String& newVersion) {
 
 void markBootValidated() {
   if (LittleFS.exists(kCandidatePath)) {
-    LittleFS.remove(kLastGoodPath);
+    // rename() pripadny existujici last_good.bin sam atomicky prepise.
     if (!LittleFS.rename(kCandidatePath, kLastGoodPath)) {
       Serial.println("[OTA] WARNING: failed to promote candidate to last_good backup");
     }

@@ -346,7 +346,7 @@ void updateWeather() {
   String payload = http.getString();
   Serial.println("Data prijata");
 
-  DynamicJsonDocument doc(4096);
+  JsonDocument doc;
   DeserializationError jsonErr = deserializeJson(doc, payload);
 
   if (jsonErr) {
