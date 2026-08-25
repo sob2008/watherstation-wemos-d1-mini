@@ -7,6 +7,9 @@ a funkcí je v [`wather-station-2dis/DOKUMENTACE.txt`](wather-station-2dis/DOKUM
 Firmware podporuje aktualizaci přes OTA (over-the-air) pomocí GitHub Releases -
 viz níže.
 
+Pro tovární přípravu nových/vrácených kusů (WiFi setup zákazníka + rovnou instalace aktuálního
+firmware) slouží samostatný sketch [`factory-sw/`](factory-sw/README.md).
+
 ## Vývoj
 
 Sketch se vyvíjí a nahrává přes Arduino IDE (žádný PlatformIO):

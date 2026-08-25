@@ -15,6 +15,14 @@ The repo currently contains only the 2-display variant (`wather-station-2dis/`).
 (Czech-language docs) also describes a 1-display variant (`wather-station-1dis/wather-station-1dis.ino`)
 that is not present in this checkout — don't assume it exists without checking.
 
+There is a second, separate sketch: `factory-sw/factory-sw.ino` — a minimal provisioning firmware
+flashed onto new/refurbished units via USB before shipping. It walks the customer through WiFi setup
+then immediately installs the latest `wather-station-2dis` release via OTA and reboots into it; see
+`factory-sw/README.md`. It duplicates the OTA client files (`Ota*.h/.cpp`, `Sha256.h/.cpp`) from
+`wather-station-2dis/` because Arduino compiles each sketch folder independently — **if you fix or
+change OTA client logic in `wather-station-2dis/`, copy the same change into `factory-sw/`** (but not
+`OtaConfig.h`, which is deliberately different between the two — see that file's own comments).
+
 ## Build / test commands
 
 **Firmware (Arduino IDE or arduino-cli)** — no Makefile/CMake, this is a normal Arduino sketch:

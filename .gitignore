@@ -1,3 +1,17 @@
 # Zkompilovane host-side testy (tests/*.cpp se kompiluji lokalne, binarky
 # se necommituji - viz README.md sekce "Testy").
 tests/*.exe
+
+# arduino-cli/Arduino IDE build cache. wather-station-2dis/build/ uz je
+# soucasti historie repozitare (commitovano drive) a zustava beze zmeny,
+# tohle jen brani, aby se stejnym zpusobem necommitovaly DALSI (napr.
+# factory-sw/build/).
+factory-sw/build/
+
+# Zkompilovany firmware pro tovarni flashovani - vzdy se builduje cerstve
+# pred flashovanim (viz factory-sw/README.md), necommituje se.
+factory-sw/!flash/bin/*.bin
+
+# Python bytecode cache (vznika pri spusteni/py_compile flash.py).
+__pycache__/
+*.pyc
