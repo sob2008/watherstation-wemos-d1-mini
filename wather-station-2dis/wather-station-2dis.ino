@@ -8,6 +8,10 @@
 #include <WiFiManager.h>
 #include <time.h>
 
+#include "OtaConfig.h"
+#include "OtaState.h"
+#include "OtaManager.h"
+
 // --- KONFIGURACE ---
 const char* LOCATION_NAME = "ROJETIN";  // Nazev lokality na displeji
 const float LAT = 49.36;  // Zemente na svou zemepisnou sirku
@@ -289,6 +293,19 @@ String getLocalTime() {
   char buffer[6];
   sprintf(buffer, "%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min);
   return String(buffer);
+}
+
+// Zobrazeni stavu OTA aktualizace na hlavnim displeji (volano z OtaManager
+// behem stahovani/flashovani, aby displej behem nekolikasekundove operace
+// nepusobil "zamrzle").
+void otaStatusCallback(const String& line1, const String& line2) {
+  disp1.clearBuffer();
+  disp1.drawRFrame(0, 0, 128, 64, 4);
+  disp1.setFont(u8g2_font_7x14B_tf);
+  disp1.drawStr(10, 28, line1.c_str());
+  disp1.setFont(u8g2_font_6x10_tf);
+  disp1.drawStr(10, 45, line2.c_str());
+  disp1.sendBuffer();
 }
 
 void updateWeather() {
@@ -591,10 +608,17 @@ void setup() {
   disp2.drawStr(25, 25, "Sekundarni");
   disp2.drawStr(35, 40, "displej");
   disp2.setFont(u8g2_font_5x7_tf);
-  disp2.drawStr(30, 55, "verze 2.0");
+  disp2.drawStr(30, 55, "verze " FIRMWARE_VERSION);
   disp2.sendBuffer();
 
   delay(2000);
+
+  // OTA: pripojit LittleFS, nacist perzistentni stav a rozhodnout o
+  // pripadnem rollbacku na predchozi firmware - vse PRED pripojenim WiFi,
+  // aby rollback nezavisel na siti (viz README, sekce OTA).
+  OtaState::begin();
+  OtaManager::setStatusCallback(otaStatusCallback);
+  OtaManager::begin();
 
   // WiFi pripojeni - Displej 1
   disp1.clearBuffer();
@@ -663,11 +687,22 @@ void setup() {
 
   Serial.println("Stahuji data...");
   updateWeather();
+
+  // Firmware se dostal az sem bez pádu/watchdog resetu a WiFi funguje -
+  // pokud jsme nabootovali z OTA, oznacit tuto verzi za funkcni (viz
+  // OtaManager.h - zabranuje rollbacku kvuli slow-start, ne kvuli
+  // skutecne vadnemu firmware).
+  OtaManager::notifyApplicationHealthy();
 }
 
 void loop() {
   // Aktualizace casu
   timeClient.update();
+
+  // OTA: neblokujici mimo aktivni kontrolu (jednou za OTA_CHECK_INTERVAL_MS).
+  // Pri nalezeni kompatibilni novejsi verze tento vola blokujici stahovani -
+  // displej behem toho ukazuje stav pres otaStatusCallback().
+  OtaManager::handle();
 
   // Aktualizace pocasi kazdych 15 minut
   if (millis() - lastUpdate > 900000) {
