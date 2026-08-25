@@ -560,8 +560,6 @@ check_esptool
 
 find_device
 
-JUST_FLASHED=0
-
 case "$1" in
 
 --help)
@@ -603,7 +601,6 @@ case "$1" in
     fi
 
     flash
-    JUST_FLASHED=1
 
 ;;
 
@@ -614,15 +611,3 @@ echo
 echo "=============================="
 ok "HOTOVO"
 echo "=============================="
-
-# Po uspesnem nahrani firmware rovnou otevreme serioovy monitor, at je hned
-# videt, jak cerstve naflashovane zarizeni bootuje (bez nutnosti spoustet
-# flash.sh --monitor zvlast).
-if [ "$JUST_FLASHED" = "1" ]
-then
-    echo
-    info "Otevírám sériový monitor (picocom: Ctrl+A pak Ctrl+X; screen: Ctrl+A pak K)..."
-    sleep 1
-    check_monitor_tool
-    monitor
-fi

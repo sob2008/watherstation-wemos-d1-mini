@@ -8,7 +8,6 @@ import os
 import re
 import sys
 import glob
-import time
 import subprocess
 
 VERSION = "1.1"
@@ -418,8 +417,6 @@ def main():
 
     find_device()
 
-    just_flashed = False
-
     if arg == "--info":
         chip_info()
 
@@ -441,26 +438,11 @@ def main():
             sys.exit(0)
 
         flash()
-        just_flashed = True
 
     print()
     print("==============================")
     ok("HOTOVO")
     print("==============================")
-
-    # Po úspěšném nahrání firmware rovnou otevřeme sériový monitor, ať je
-    # hned vidět, jak čerstvě naflashované zařízení bootuje (bez nutnosti
-    # spouštět flash.py --monitor zvlášť). --info/--erase/--monitor toto
-    # chování nepotřebují (buď monitor už běžel, nebo na flashi nezáleží).
-    if just_flashed:
-        if have_pyserial:
-            print()
-            info("Otevírám sériový monitor (Ctrl+] pro ukončení)...")
-            time.sleep(1)  # dát OS chvilku uvolnit port po esptool, než ho znovu otevřeme
-            monitor()
-        else:
-            info("pyserial není k dispozici, sériový monitor se neotevře automaticky.")
-            info(f"Spusťte ho ručně: {sys.argv[0]} --monitor")
 
 
 if __name__ == "__main__":

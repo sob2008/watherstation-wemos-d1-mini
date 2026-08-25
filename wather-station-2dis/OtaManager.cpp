@@ -31,18 +31,37 @@ void reportStatus(const String& l1, const String& l2) {
   }
 }
 
-// --- GitHub Release JSON (filtrovane, aby se na ESP8266 nedeserializovaly
-//     zbytecne velke JSON odpovedi do RAM) ---
-
-bool fetchJson(BearSSL::WiFiClientSecure& client, HTTPClient& http, const String& url,
-               JsonDocument& doc, const JsonDocument* filter) {
+// Spolecny zacatek HTTP pozadavku - vsechny tri mista, ktera OTA pouziva
+// (GitHub API, firmware.json, firmware.bin.sha256, firmware.bin), musi
+// nasledovat presmerovani: "browser_download_url" GitHub Release assetu
+// je VZDY 302 redirect na CDN (objects.githubusercontent.com), bez ohledu
+// na to, jestli jde o firmware.bin nebo maly .json/.sha256 soubor. Puvodne
+// to bylo nastavene jen pro stahovani firmware.bin, cimz stahovani
+// firmware.json/firmware.bin.sha256 tise selhavalo na HTTP 302 - proto je
+// to ted na jednom miste, aby se to nemohlo znovu rozjet jen pro cast pozadavku.
+bool httpBeginCommon(HTTPClient& http, BearSSL::WiFiClientSecure& client, const String& url,
+                      bool acceptJson) {
   if (!http.begin(client, url)) {
     Serial.println("[OTA] ERROR: HTTP begin failed");
     return false;
   }
   http.addHeader("User-Agent", kUserAgent);
-  http.addHeader("Accept", "application/vnd.github+json");
+  if (acceptJson) {
+    http.addHeader("Accept", "application/vnd.github+json");
+  }
   http.setTimeout(OTA_CONNECT_TIMEOUT_MS);
+  http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+  return true;
+}
+
+// --- GitHub Release JSON (filtrovane, aby se na ESP8266 nedeserializovaly
+//     zbytecne velke JSON odpovedi do RAM) ---
+
+bool fetchJson(BearSSL::WiFiClientSecure& client, HTTPClient& http, const String& url,
+               JsonDocument& doc, const JsonDocument* filter) {
+  if (!httpBeginCommon(http, client, url, true)) {
+    return false;
+  }
 
   int code = http.GET();
   if (code != 200) {
@@ -136,9 +155,7 @@ Metadata fetchMetadata(BearSSL::WiFiClientSecure& client, HTTPClient& http, cons
 // Vraci prvnich 64 po sobe jdoucich hex znaku, nebo prazdny retezec.
 String fetchChecksumFile(BearSSL::WiFiClientSecure& client, HTTPClient& http, const String& url) {
   if (url.length() == 0) return "";
-  if (!http.begin(client, url)) return "";
-  http.addHeader("User-Agent", kUserAgent);
-  http.setTimeout(OTA_CONNECT_TIMEOUT_MS);
+  if (!httpBeginCommon(http, client, url, false)) return "";
 
   int code = http.GET();
   if (code != 200) {
@@ -186,13 +203,9 @@ ApplyResult downloadAndApply(BearSSL::WiFiClientSecure& client, HTTPClient& http
   }
   Serial.println("[OTA] Size check: OK");
 
-  if (!http.begin(client, url)) {
-    Serial.println("[OTA] ERROR: HTTP begin failed");
+  if (!httpBeginCommon(http, client, url, false)) {
     return ApplyResult::Failed;
   }
-  http.addHeader("User-Agent", kUserAgent);
-  http.setTimeout(OTA_CONNECT_TIMEOUT_MS);
-  http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
   Serial.println("[OTA] Downloading firmware...");
   int code = http.GET();

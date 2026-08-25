@@ -42,11 +42,12 @@ jako `wather-station-2dis/OtaConfig.h` - pokud se tyto změní tam, změňte je 
    - Windows: `python flash.py`
    - Linux/macOS: `./flash.sh`
 
-   Skript sám smaže flash, nahraje `factory-sw` a **po úspěšném nahrání rovnou otevře sériový
-   monitor** (115200 baud) - uvidíte přesně to, co vidí zákazník (a hlavně technické `[OTA] ...`
-   hlášky, kdyby něco selhalo). Monitor ukončíte `Ctrl+]` (Windows/pyserial) resp. `Ctrl+A` `Ctrl+X`
-   / `Ctrl+A` `K` (Linux picocom/screen).
-4. Zařízení nechte zapnuté, dokud se samo nerestartuje do ostrého firmware (v monitoru uvidíte
+   Skript sám smaže flash a nahraje `factory-sw`.
+4. Pro sledování průběhu (uvidíte přesně to, co vidí zákazník, a hlavně technické `[OTA] ...`
+   hlášky, kdyby něco selhalo) spusťte zvlášť sériový monitor (115200 baud):
+   - Windows: `python flash.py --monitor`
+   - Linux/macOS: `./flash.sh --monitor`
+5. Zařízení nechte zapnuté, dokud se samo nerestartuje do ostrého firmware (v monitoru uvidíte
    `[OTA] Rebooting...`). Pak je připravené k odeslání zákazníkovi - zákazník ho jen zapojí a
    projde stejným WiFi-setup krokem, který jste právě viděli.
 
