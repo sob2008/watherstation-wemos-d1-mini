@@ -1,0 +1,292 @@
+================================================================================
+                    METEOSTANICE ESP8266 - DOKUMENTACE
+================================================================================
+
+Autor: Meteostanice Rojetin
+Verze: 2.0
+Datum: 2025
+
+================================================================================
+                              OBSAH
+================================================================================
+
+1. Popis projektu
+2. Potrebny hardware
+3. Zapojeni - verze s 1 displejem
+4. Zapojeni - verze se 2 displeji
+5. Konfigurace polohy
+6. Instalace a nahrani
+7. Pouziti a funkce
+8. Reseni problemu
+
+================================================================================
+                         1. POPIS PROJEKTU
+================================================================================
+
+Meteostanice zobrazuje aktualni pocasi a predpoved na OLED displeji.
+Data jsou stahovana z bezplatne sluzby Open-Meteo.com.
+
+Funkce:
+- Aktualni teplota, vlhkost, vitr, srazky
+- Predpoved na zitra a pozitri
+- Automaticky letni/zimni cas
+- Graficke ikonky pocasi
+- WiFi pripojeni pres WiFiManager (konfiguracni portal)
+
+Dostupne verze:
+- wather-station-1dis/wather-station-1dis.ino - verze s 1 displejem
+- wather-station-2dis/wather-station-2dis.ino - verze se 2 displeji
+
+================================================================================
+                        2. POTREBNY HARDWARE
+================================================================================
+
+Zakladni:
+- Wemos D1 Mini (ESP8266)
+- OLED displej 1.3" SH1106 128x64 (SPI verze)
+- Propojovaci kabely
+- Micro USB kabel pro napajeni
+
+Pro verzi se 2 displeji:
+- 2x OLED displej 1.3" SH1106 128x64 (SPI verze)
+
+Displej musi byt SPI verze s piny:
+GND, VCC, CLK (SCK), DATA (MOSI), RST (RES), DC, CS
+
+================================================================================
+                   3. ZAPOJENI - VERZE S 1 DISPLEJEM
+================================================================================
+
+Soubor: wather-station-1dis.ino
+
+OLED Displej          Wemos D1 Mini
+-----------          --------------
+GND         <---->   GND
+VCC         <---->   3.3V (nebo 5V podle displeje)
+CLK (SCK)   <---->   D5 (GPIO14)
+DATA (MOSI) <---->   D7 (GPIO13)
+RST (RES)   <---->   D1 (GPIO5)
+DC          <---->   D3 (GPIO0)
+CS          <---->   D2 (GPIO4)
+
+
+Schema zapojeni:
+
+    Wemos D1 Mini
+    +----------+
+    |      3.3V|-----> VCC displeje
+    |       GND|-----> GND displeje
+    |        D1|-----> RST (Reset)
+    |        D2|-----> CS  (Chip Select)
+    |        D3|-----> DC  (Data/Command)
+    |        D5|-----> CLK (Clock)
+    |        D7|-----> DATA (MOSI)
+    +----------+
+
+================================================================================
+                  4. ZAPOJENI - VERZE SE 2 DISPLEJI
+================================================================================
+
+Soubor: wather-station-2dis.ino
+
+DULEZITE: Kazdy displej potrebuje VLASTNI CS a RESET pin!
+          CLK, DATA a DC jsou sdilene.
+
+Displej 1 (hlavni - aktualni pocasi + ZITRA)
+--------------------------------------------
+GND         <---->   GND
+VCC         <---->   3.3V
+CLK (SCK)   <---->   D5 (GPIO14)  [sdileny]
+DATA (MOSI) <---->   D7 (GPIO13)  [sdileny]
+RST (RES)   <---->   D1 (GPIO5)   [vlastni]
+DC          <---->   D3 (GPIO0)   [sdileny]
+CS          <---->   D2 (GPIO4)   [vlastni]
+
+Displej 2 (sekundarni - detaily + POZITRI)
+------------------------------------------
+GND         <---->   GND
+VCC         <---->   3.3V
+CLK (SCK)   <---->   D5 (GPIO14)  [sdileny]
+DATA (MOSI) <---->   D7 (GPIO13)  [sdileny]
+RST (RES)   <---->   D4 (GPIO2)   [vlastni]
+DC          <---->   D3 (GPIO0)   [sdileny]
+CS          <---->   D6 (GPIO12)  [vlastni]
+
+
+Schema zapojeni 2 displeje:
+
+    Wemos D1 Mini
+    +----------+
+    |      3.3V|-----> VCC displej 1 + VCC displej 2
+    |       GND|-----> GND displej 1 + GND displej 2
+    |        D1|-----> RST displej 1
+    |        D2|-----> CS  displej 1
+    |        D3|-----> DC  displej 1 + DC  displej 2 (sdileny)
+    |        D4|-----> RST displej 2
+    |        D5|-----> CLK displej 1 + CLK displej 2 (sdileny)
+    |        D6|-----> CS  displej 2
+    |        D7|-----> DATA displej 1 + DATA displej 2 (sdileny)
+    +----------+
+
+
+Tabulka pinu:
++--------+--------+-----------+-----------+
+| Pin    | GPIO   | Displej 1 | Displej 2 |
++--------+--------+-----------+-----------+
+| D1     | GPIO5  | RST       | -         |
+| D2     | GPIO4  | CS        | -         |
+| D3     | GPIO0  | DC        | DC        |
+| D4     | GPIO2  | -         | RST       |
+| D5     | GPIO14 | CLK       | CLK       |
+| D6     | GPIO12 | -         | CS        |
+| D7     | GPIO13 | DATA      | DATA      |
++--------+--------+-----------+-----------+
+
+POZOR: Nepouzivejte D8 (GPIO15) - ma pull-down rezistor a zpusobuje problemy!
+
+================================================================================
+                       5. KONFIGURACE POLOHY
+================================================================================
+
+V kodu na zacatku souboru najdete sekci KONFIGURACE:
+
+// --- KONFIGURACE ---
+const char* LOCATION_NAME = "ROJETIN";  // Nazev lokality na displeji
+const float LAT = 49.36;  // Zemepisna sirka
+const float LON = 16.26;  // Zemepisna delka
+const char* TIMEZONE = "CET-1CEST,M3.5.0,M10.5.0/3";
+
+LOCATION_NAME - Nazev vasi lokality, ktery se zobrazi na displeji
+                (v banneru a na uvodni obrazovce)
+LAT           - Zemepisna sirka pro stahovani dat o pocasi
+LON           - Zemepisna delka pro stahovani dat o pocasi
+
+Jak zjistit souradnice sve lokality:
+1. Otevrete Google Maps (maps.google.com)
+2. Najdete svou lokaci
+3. Kliknete pravym tlacitkem na misto
+4. Souradnice se zobrazi v menu (napr. 49.3612, 16.2584)
+5. Prvni cislo = LAT (sirka), druhe = LON (delka)
+
+Priklady konfigurace:
+- Praha:      LOCATION_NAME = "PRAHA",    LAT = 50.08, LON = 14.42
+- Brno:       LOCATION_NAME = "BRNO",     LAT = 49.19, LON = 16.61
+- Ostrava:    LOCATION_NAME = "OSTRAVA",  LAT = 49.82, LON = 18.26
+- Plzen:      LOCATION_NAME = "PLZEN",    LAT = 49.74, LON = 13.38
+
+Casova zona:
+Pro Ceskou republiku nechte: "CET-1CEST,M3.5.0,M10.5.0/3"
+Toto zajisti automaticky prechod na letni/zimni cas.
+
+================================================================================
+                      6. INSTALACE A NAHRANI
+================================================================================
+
+Potrebne knihovny v Arduino IDE:
+1. ESP8266 board (Tools -> Board -> Boards Manager -> esp8266)
+2. U8g2 (Sketch -> Include Library -> Manage Libraries -> U8g2)
+3. ArduinoJson (Manage Libraries -> ArduinoJson)
+4. WiFiManager (Manage Libraries -> WiFiManager by tzapu)
+5. NTPClient (Manage Libraries -> NTPClient)
+
+Postup nahrani:
+1. Otevrete .ino soubor v Arduino IDE
+2. Vyberte desku: Tools -> Board -> ESP8266 Boards -> LOLIN(WEMOS) D1 R2 & mini
+3. Vyberte port: Tools -> Port -> COMx (nebo /dev/ttyUSBx na Linuxu)
+4. Upravte souradnice LAT a LON podle sve polohy
+5. Kliknete na Upload (sipka doprava)
+
+================================================================================
+                       7. POUZITI A FUNKCE
+================================================================================
+
+Prvni spusteni:
+1. Po nahrani se ESP8266 restartuje
+2. Pokud neni ulozena WiFi sit, vytvori pristupovy bod "MeteoStation_AP"
+3. Pripojte se k teto siti telefonem nebo PC
+4. Otevrete prohlizec a jdete na 192.168.4.1
+5. Vyberte svou WiFi sit a zadejte heslo
+6. ESP8266 se pripoji a zacne zobrazovat pocasi
+
+Zobrazovane obrazovky (1 displej):
+1. Aktualni teplota s ikonkou a popisem
+2. Detaily (vlhkost, vitr, srazky)
+3. Predpoved na ZITRA
+4. Predpoved na POZITRI
+Obrazovky se automaticky stridaji kazdych 6 sekund.
+
+Zobrazovane obrazovky (2 displeje):
+Displej 1:
+- Aktualni pocasi (s bannerem s nazvem lokality a casem)
+- Predpoved ZITRA (bez banneru)
+
+Displej 2:
+- Detaily (vlhkost, vitr, srazky, WiFi signal)
+- Predpoved POZITRI
+
+Obrazovky se stridaji kazdych 8 sekund.
+
+Aktualizace dat:
+- Pocasi se aktualizuje automaticky kazdych 15 minut
+- Cas se synchronizuje pres NTP server
+
+Ikonky pocasi:
+- Slunce = jasno
+- Slunce s mrakem = polojasno
+- Mrak = zatazeno
+- Mrak s kapkami = dest/mrholeni
+- Mrak s vlockami = snih
+- Mrak s bleskem = boure
+
+================================================================================
+                       8. RESENI PROBLEMU
+================================================================================
+
+Problem: Displej sviti bile / nic nezobrazuje
+Reseni:
+- Zkontrolujte zapojeni vsech vodicu
+- Overete ze pouzivate spravne piny
+- Zkuste prohodit VCC mezi 3.3V a 5V
+
+Problem: Druhy displej je tmavy (verze 2-dis)
+Reseni:
+- Kazdy displej MUSI mit vlastni RESET pin (ne jen CS)
+- Zkontrolujte ze D1=RST1, D4=RST2
+
+Problem: WiFi se nepripojuje
+Reseni:
+- Podrzenim tlacitka RESET na 10s se smaze konfigurace
+- Pripojte se k AP "MeteoStation_AP" a nastavte znovu
+
+Problem: Zobrazuje se 0.0 stupnu
+Reseni:
+- Zkontrolujte pripojeni k internetu
+- Overete souradnice LAT/LON
+- V Serial Monitoru (115200 baud) sledujte chybove hlasky
+
+Problem: Spatny cas
+Reseni:
+- Cas se synchronizuje automaticky
+- Po startu muze trvat az 30 sekund nez se synchronizuje
+- Casova zona je nastavena na CR s automatickym letnim casem
+
+Problem: Ikony se zobrazuji spatne (sum/cary)
+Reseni:
+- Ikony jsou ve formatu XBM (LSB-first)
+- Pokud mate vlastni ikony, musi byt ve spravnem formatu
+
+Serial Monitor:
+Pro diagnostiku pripojte USB a otevrete Serial Monitor:
+Tools -> Serial Monitor, nastavte 115200 baud
+Uvidite informace o pripojeni, stahovani dat a pripadne chyby.
+
+================================================================================
+                           KONTAKT
+================================================================================
+
+Projekt vyuziva:
+- Open-Meteo.com - bezplatna API pro pocasi
+- U8g2 knihovnu - grafika na OLED
+- WiFiManager - snadna konfigurace WiFi
+
+================================================================================
