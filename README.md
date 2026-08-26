@@ -42,6 +42,21 @@ nebo výchozí lokalitou (`ROJETIN`, 49.36/16.26) - nikdy se kvůli tomu nezablo
 Podrobný zákaznický popis je v [`wather-station-2dis/DOKUMENTACE.txt`](wather-station-2dis/DOKUMENTACE.txt),
 sekce 5.
 
+**Diakritika:** displeje (fonty `U8g2`) neumí česká písmena s háčkem/kroužkem (č, ř, š,
+ě, ď, ť, ň, ů, ž) - jen s čárkou (á, é, í, ó, ú, ý). Zákazník proto do formuláře zadává
+název obce klidně s plnou diakritikou (přesnější shoda v geokódování), ale na displeji
+se zobrazí bez ní (`stripDiacritics()` v `LocationConfig.cpp`) - ověřeno testy v
+`tests/test_strip_diacritics.cpp`.
+
+## Jazyk zobrazení (`Lang`, cs/en)
+
+Displej lze přepnout mezi češtinou (výchozí) a angličtinou - další pole ve stejném
+WiFiManager formuláři jako WiFi a obec ("Jazyk / Language (cs/en)"). Nastavení se
+ukládá do LittleFS (`/config/language.json`, přežije OTA) a použije se pro všechny
+texty na displeji (stavy počasí, směry větru, hlášky při připojování) - viz
+[`Lang.h/.cpp`](wather-station-2dis/Lang.h), duplikovaný do `factory-sw/` ze stejného
+důvodu jako OTA klient. Diagnostika na sériové lince zůstává vždy v češtině.
+
 ## OTA aktualizace přes GitHub Releases
 
 ### Jak to funguje (přehled)
@@ -332,12 +347,13 @@ zvláštní příprava není potřeba.
 
 ## Testy
 
-Logika, která nezávisí na Arduino/ESP8266 API (SHA-256, porovnávání verzí),
-je pokrytá host-side testy mimo sketch, spustitelnými běžným g++:
+Logika, která nezávisí na Arduino/ESP8266 API (SHA-256, porovnávání verzí, odstranění
+diakritiky), je pokrytá host-side testy mimo sketch, spustitelnými běžným g++:
 
 ```
 g++ -std=c++17 -Wall -Wextra -o test_sha256.exe tests/test_sha256.cpp wather-station-2dis/Sha256.cpp
 g++ -std=c++17 -Wall -Wextra -o test_ota_version.exe tests/test_ota_version.cpp wather-station-2dis/OtaVersion.cpp
+g++ -std=c++17 -Wall -Wextra -o test_strip_diacritics.exe tests/test_strip_diacritics.cpp
 ```
 
 Zbytek OTA modulů (`OtaState`, `OtaManager` - LittleFS, HTTPClient, Update)

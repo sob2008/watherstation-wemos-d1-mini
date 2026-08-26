@@ -25,6 +25,7 @@
 #include "OtaState.h"
 #include "OtaManager.h"
 #include "LocationConfig.h"
+#include "Lang.h"
 
 // Piny - stejne jako ostry firmware (wather-station-2dis), tovarni SW bezi
 // na identickem hardwaru. Kazdy displej ma vlastni CS a RESET, viz
@@ -67,7 +68,7 @@ void showSecondary(const char* line1, const char* line2) {
 
 // Volano z OtaManager behem aktivniho stahovani/flashovani.
 void otaStatusCallback(const String& line1, const String& line2) {
-  showStatus("INSTALUJI SOFTWARE", line1.c_str(), line2.c_str());
+  showStatus(Lang::t(LangId::FactoryInstallingTitle), line1.c_str(), line2.c_str());
 }
 
 void setup() {
@@ -91,13 +92,14 @@ void setup() {
   showSecondary("Vitejte!", "Chvilku strpeni");
   delay(2000);
 
-  // LittleFS + perzistentni OTA stav a lokalita. Na zcela novem/prave
+  // LittleFS + perzistentni OTA stav, lokalita a jazyk. Na zcela novem/prave
   // smazanem zarizeni (flash.py/flash.sh delaji plny erase_flash pred
   // zapisem) je tohle vzdy cisty start - viz README v tomto adresari.
   OtaState::begin();
   OtaManager::setStatusCallback(otaStatusCallback);
   OtaManager::begin();
   LocationConfig::begin();
+  Lang::begin();
 
   // --- Instrukce pro zakaznika ---
   Serial.println("KROK 1: Pripojte se telefonem nebo pocitacem na WiFi sit:");
@@ -106,8 +108,8 @@ void setup() {
   Serial.println("        a vyberte vasi domaci WiFi sit + zadejte obec/mesto.");
   Serial.println();
 
-  showStatus("KROK 1/2", "Pripojte se na WiFi:", "MeteoStation_AP");
-  showSecondary("Pak zadejte", "WiFi + obec");
+  showStatus(Lang::t(LangId::FactoryStep1), Lang::t(LangId::FactoryConnectToWifi), "MeteoStation_AP");
+  showSecondary(Lang::t(LangId::FactoryThenEnter), Lang::t(LangId::FactoryWifiAndCity));
 
   // Stejny vzor jako wather-station-2dis.ino: pri vyprseni portalu radeji
   // cely ESP restartuje, nez aby se autoConnect() volalo znovu na tomtez
@@ -122,20 +124,31 @@ void setup() {
       "placeholder='napr. Rojetin, okres Sumperk'");
   wm.addParameter(&cityParam);
 
+  // Jazyk zobrazeni ("cs"/"en") - viz Lang.h.
+  String langBefore = String(Lang::code());
+  WiFiManagerParameter langParam(
+      "lang", "Jazyk / Language (cs/en)", langBefore.c_str(), 2,
+      "placeholder='cs'");
+  wm.addParameter(&langParam);
+
   wm.setConfigPortalTimeout(180);
   if (!wm.autoConnect("MeteoStation_AP")) {
     Serial.println("Konfiguracni portal WiFi vyprsel (180s), restartuji...");
-    showStatus("KROK 1/2", "Zkousim znovu...", "");
+    showStatus(Lang::t(LangId::FactoryStep1), Lang::t(LangId::FactoryRetrying), "");
     delay(2000);
     ESP.restart();
   }
+
+  // Zpracovat pripadnou zmenu jazyka JESTE PRED zbytkem obrazovek, aby uz
+  // pouzily spravny jazyk.
+  Lang::setLanguage(String(langParam.getValue()));
 
   Serial.print("WiFi pripojeno. IP adresa: ");
   Serial.println(WiFi.localIP());
   Serial.println();
 
-  showStatus("WIFI PRIPOJENO", WiFi.localIP().toString().c_str(), "");
-  showSecondary("Pripojeno!", "");
+  showStatus(Lang::t(LangId::FactoryWifiConnected), WiFi.localIP().toString().c_str(), "");
+  showSecondary(Lang::t(LangId::FactoryConnectedExcl), "");
   delay(1500);
 
   // Zpracovat zadanou lokalitu.
@@ -145,15 +158,15 @@ void setup() {
     Serial.print("Zadana lokalita: ");
     Serial.println(cityAfter);
 
-    showStatus("LOKALITA", "Hledam:", cityAfter.c_str());
+    showStatus(Lang::t(LangId::FactoryLocation), Lang::t(LangId::FactorySearching), cityAfter.c_str());
 
     if (!LocationConfig::geocodeAndSave(cityAfter)) {
       Serial.println("Lokalitu se nepodarilo najit, pouziva se vychozi - zakaznik ji");
       Serial.println("muze pozdeji zmenit dvojitym RESETem na ostrem firmware.");
-      showStatus("LOKALITA", "Nenalezena,", "pouzivam vychozi");
+      showStatus(Lang::t(LangId::FactoryLocation), Lang::t(LangId::FactoryNotFound), Lang::t(LangId::FactoryUsingDefault));
       delay(1500);
     } else {
-      showStatus("LOKALITA", "Nalezena:", LocationConfig::name().c_str());
+      showStatus(Lang::t(LangId::FactoryLocation), Lang::t(LangId::FactoryFound), LocationConfig::name().c_str());
       delay(1000);
     }
   }
@@ -162,8 +175,8 @@ void setup() {
   Serial.println("        (podrobny prubeh viz [OTA] hlasky nize)");
   Serial.println();
 
-  showStatus("KROK 2/2", "Instaluji aktualni", "software...");
-  showSecondary("Prosim cekejte", "Nevypinejte napajeni");
+  showStatus(Lang::t(LangId::FactoryStep2), Lang::t(LangId::FactoryInstalling), Lang::t(LangId::FactorySoftware));
+  showSecondary(Lang::t(LangId::FactoryPleaseWaitCaps), Lang::t(LangId::FactoryDoNotUnplug));
 }
 
 void loop() {

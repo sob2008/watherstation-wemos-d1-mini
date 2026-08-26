@@ -156,15 +156,33 @@ na zarizeni pri prvnim pripojeni k WiFi:
 2. Pripojte se na ni telefonem/pocitacem, v prohlizeci se otevre (nebo
    rucne otevrete) stranka 192.168.4.1.
 3. Kromě vyberu domaci WiFi site tam je i pole "Vase obec/mesto" - napiste
-   nazev sve obce (napr. "Rojetin", pripadne s upresnenim jako "Rojetin,
-   okres Sumperk", pokud existuje vic stejnojmennych obci).
-4. Po ulozeni se zarizeni pripoji k WiFi a samo dohleda souradnice pres
+   nazev sve obce klidne s hacky a carkami (napr. "Rojetin", "Zdar nad
+   Sazavou", pripadne s upresnenim jako "Rojetin, okres Sumperk", pokud
+   existuje vic stejnojmennych obci) - diakritika pomaha presnejsimu
+   vyhledani. Na displeji samotnem se ale nazev vzdy zobrazi BEZ diakritiky
+   (pouzite fonty hacky/krouzek neumi, viz nize).
+4. Je tam i pole "Jazyk / Language (cs/en)" - napiste "cs" pro cestinu
+   (vychozi) nebo "en" pro anglictinu. Prepina texty na displeji (stavy
+   pocasi, smery vetru, hlasky pri pripojovani) - viz DALSI JAZYK nize.
+5. Po ulozeni se zarizeni pripoji k WiFi a samo dohleda souradnice pres
    Open-Meteo Geocoding API (stejna sluzba, ktera dodava i data o pocasi).
    Vysledek (nazev + souradnice) se ulozi trvale do pameti zarizeni.
 
 Pokud se lokalita nepodari dohledat (preklep, neexistujici nazev, vypadek
 site), zarizeni pokracuje s predchozi/vychozi lokalitou a nic se nerozbije -
 lze to kdykoliv opravit postupem nize.
+
+DIAKRITIKA NA DISPLEJI:
+Pouzite fonty umi ceska pismena s carkou (a, e, i, o, u, y), ale ne s
+hackem ani krouzkem (c, d, e, n, r, s, t, u, z). Proto se nazev obce na
+displeji zobrazuje bez diakritiky, i kdyz ho do formulare zadate s ni -
+diakritika se pouzije jen pro presnejsi vyhledani souradnic.
+
+DALSI JAZYK (cestina/anglictina):
+Pole "Jazyk / Language" v konfiguracnim portalu (viz vyse) prepina VSECHNY
+texty na displeji mezi cestinou (vychozi) a anglictinou. Da se zmenit
+kdykoliv pozdeji stejnym postupem jako zmena polohy (dvojity RESET, viz
+nize). Diagnostika v Serial Monitoru zustava vzdy v cestine.
 
 ZMENA POLOHY (nebo WiFi) POZDEJI:
 Rychle 2x za sebou stisknete fyzicke RESET tlacitko na desce (do ~2 sekund

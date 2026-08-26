@@ -82,6 +82,68 @@ void readFromDisk() {
   g_configured = true;
 }
 
+// Mapovani UTF-8 bajtovych dvojic ceskych pismen s diakritikou na "holy"
+// ASCII zaklad - pouziva se pro zobrazeni na displeji (fonty tam hacky/carky
+// neumi, viz DOKUMENTACE.txt), zatimco puvodni nazev se zadanou diakritikou
+// jde jako geokodovaci dotaz (viz geocodeAndSave nize - presnejsi shoda).
+struct DiacriticMap {
+  uint8_t b1;
+  uint8_t b2;
+  char ascii;
+};
+
+const DiacriticMap kDiacritics[] = {
+  {0xC3, 0x81, 'A'}, {0xC3, 0xA1, 'a'},  // A a
+  {0xC4, 0x8C, 'C'}, {0xC4, 0x8D, 'c'},  // C c (hacek)
+  {0xC4, 0x8E, 'D'}, {0xC4, 0x8F, 'd'},  // D d (hacek)
+  {0xC3, 0x89, 'E'}, {0xC3, 0xA9, 'e'},  // E e
+  {0xC4, 0x9A, 'E'}, {0xC4, 0x9B, 'e'},  // E e (hacek)
+  {0xC3, 0x8D, 'I'}, {0xC3, 0xAD, 'i'},  // I i
+  {0xC5, 0x87, 'N'}, {0xC5, 0x88, 'n'},  // N n (hacek)
+  {0xC3, 0x93, 'O'}, {0xC3, 0xB3, 'o'},  // O o
+  {0xC5, 0x98, 'R'}, {0xC5, 0x99, 'r'},  // R r (hacek)
+  {0xC5, 0xA0, 'S'}, {0xC5, 0xA1, 's'},  // S s (hacek)
+  {0xC5, 0xA4, 'T'}, {0xC5, 0xA5, 't'},  // T t (hacek)
+  {0xC3, 0x9A, 'U'}, {0xC3, 0xBA, 'u'},  // U u
+  {0xC5, 0xAE, 'U'}, {0xC5, 0xAF, 'u'},  // U u (krouzek)
+  {0xC3, 0x9D, 'Y'}, {0xC3, 0xBD, 'y'},  // Y y
+  {0xC5, 0xBD, 'Z'}, {0xC5, 0xBE, 'z'},  // Z z (hacek)
+};
+
+// Prevede UTF-8 retezec na ASCII: rozpoznana ceska pismena s diakritikou se
+// nahradi holym zakladem, ostatni vicebajtove UTF-8 znaky (neceka
+// diakritika) se zahodi (radeji nic nez smetí na displeji), cisty ASCII
+// projde beze zmeny.
+String stripDiacritics(const String& utf8) {
+  String out;
+  out.reserve(utf8.length());
+  size_t i = 0;
+  size_t len = utf8.length();
+  while (i < len) {
+    uint8_t b1 = static_cast<uint8_t>(utf8[i]);
+    if (b1 < 0x80) {
+      out += static_cast<char>(b1);
+      i += 1;
+    } else if ((b1 & 0xE0) == 0xC0 && i + 1 < len) {
+      uint8_t b2 = static_cast<uint8_t>(utf8[i + 1]);
+      for (size_t k = 0; k < sizeof(kDiacritics) / sizeof(kDiacritics[0]); k++) {
+        if (kDiacritics[k].b1 == b1 && kDiacritics[k].b2 == b2) {
+          out += kDiacritics[k].ascii;
+          break;
+        }
+      }
+      i += 2;
+    } else if ((b1 & 0xF0) == 0xE0 && i + 2 < len) {
+      i += 3; // 3bajtovy UTF-8 znak mimo ceskou diakritiku - zahodit
+    } else if ((b1 & 0xF8) == 0xF0 && i + 3 < len) {
+      i += 4; // 4bajtovy UTF-8 znak - zahodit
+    } else {
+      i += 1; // neplatny/osamoceny bajt - preskocit
+    }
+  }
+  return out;
+}
+
 // Procentualni zakodovani pro pouziti jako hodnota query parametru v URL
 // (jmeno obce muze obsahovat mezery, carky a ceske diakritiky - vse jsou
 // v UTF-8 vicebajtove znaky, koduji se bajt po bajtu).
@@ -179,7 +241,9 @@ bool geocodeAndSave(const String& query) {
     return false;
   }
 
-  g_name = String(foundName);
+  // Displej hacky/carky neumi (viz stripDiacritics vyse) - geokodovaci
+  // dotaz uz ale probehl s puvodni diakritikou (presnejsi shoda v Open-Meteo).
+  g_name = stripDiacritics(String(foundName));
   g_lat = foundLat;
   g_lon = foundLon;
   g_configured = true;

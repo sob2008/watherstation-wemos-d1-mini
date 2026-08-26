@@ -12,6 +12,7 @@
 #include "OtaState.h"
 #include "OtaManager.h"
 #include "LocationConfig.h"
+#include "Lang.h"
 
 // --- KONFIGURACE ---
 // LOCATION_NAME/LAT/LON uz nejsou pevne v kodu - kazdy zakaznik ma jinou
@@ -187,53 +188,53 @@ unsigned long lastSwitch = 0;
 bool dataValid = false;
 String lastError = "";
 
-// Funkce pro prevod kodu pocasi na text
+// Funkce pro prevod kodu pocasi na text (v aktualne nastavenem jazyce, viz Lang.h)
 String getWeatherStatus(int code) {
   switch (code) {
-    case 0: return "Jasno";
-    case 1: return "Skoro jasno";
-    case 2: return "Polojasno";
-    case 3: return "Zatazeno";
-    case 45: case 48: return "Mlha";
-    case 51: return "Slabe mrholeni";
-    case 53: return "Mrholeni";
-    case 55: return "Silne mrholeni";
-    case 56: case 57: return "Mraz. mrholeni";
-    case 61: return "Slaby dest";
-    case 63: return "Dest";
-    case 65: return "Silny dest";
-    case 66: case 67: return "Mraz. dest";
-    case 71: return "Slabe snezeni";
-    case 73: return "Snezeni";
-    case 75: return "Silne snezeni";
-    case 77: return "Sneh. zrna";
-    case 80: return "Slaba preh.";
-    case 81: return "Prehanka";
-    case 82: return "Silna preh.";
-    case 85: case 86: return "Sneh. preh.";
-    case 95: return "Boure";
-    case 96: case 99: return "Boure s krup.";
-    default: return "Zatazeno";
+    case 0: return Lang::t(LangId::WeatherClear);
+    case 1: return Lang::t(LangId::WeatherMostlyClear);
+    case 2: return Lang::t(LangId::WeatherPartlyCloudy);
+    case 3: return Lang::t(LangId::WeatherCloudy);
+    case 45: case 48: return Lang::t(LangId::WeatherFog);
+    case 51: return Lang::t(LangId::WeatherLightDrizzle);
+    case 53: return Lang::t(LangId::WeatherDrizzle);
+    case 55: return Lang::t(LangId::WeatherHeavyDrizzle);
+    case 56: case 57: return Lang::t(LangId::WeatherFreezingDrizzle);
+    case 61: return Lang::t(LangId::WeatherLightRain);
+    case 63: return Lang::t(LangId::WeatherRain);
+    case 65: return Lang::t(LangId::WeatherHeavyRain);
+    case 66: case 67: return Lang::t(LangId::WeatherFreezingRain);
+    case 71: return Lang::t(LangId::WeatherLightSnow);
+    case 73: return Lang::t(LangId::WeatherSnow);
+    case 75: return Lang::t(LangId::WeatherHeavySnow);
+    case 77: return Lang::t(LangId::WeatherSnowGrains);
+    case 80: return Lang::t(LangId::WeatherLightShowers);
+    case 81: return Lang::t(LangId::WeatherShowers);
+    case 82: return Lang::t(LangId::WeatherHeavyShowers);
+    case 85: case 86: return Lang::t(LangId::WeatherSnowShowers);
+    case 95: return Lang::t(LangId::WeatherThunderstorm);
+    case 96: case 99: return Lang::t(LangId::WeatherThunderstormHail);
+    default: return Lang::t(LangId::WeatherCloudy);
   }
 }
 
-// Kratsi verze pro predpoved
+// Kratsi verze pro predpoved (v aktualne nastavenem jazyce)
 String getWeatherShort(int code) {
   switch (code) {
-    case 0: return "Jasno";
-    case 1: case 2: return "Polojasno";
-    case 3: return "Zatazeno";
-    case 45: case 48: return "Mlha";
-    case 51: case 53: case 55: return "Mrholeni";
-    case 56: case 57: return "Mrz.mrh.";
-    case 61: case 63: case 65: return "Dest";
-    case 66: case 67: return "Mrz.dest";
-    case 71: case 73: case 75: return "Snezeni";
-    case 77: return "Sn.zrna";
-    case 80: case 81: case 82: return "Prehanky";
-    case 85: case 86: return "Sn.preh.";
-    case 95: case 96: case 99: return "Boure";
-    default: return "---";
+    case 0: return Lang::t(LangId::WeatherShortClear);
+    case 1: case 2: return Lang::t(LangId::WeatherShortPartlyCloudy);
+    case 3: return Lang::t(LangId::WeatherShortCloudy);
+    case 45: case 48: return Lang::t(LangId::WeatherShortFog);
+    case 51: case 53: case 55: return Lang::t(LangId::WeatherShortDrizzle);
+    case 56: case 57: return Lang::t(LangId::WeatherShortFreezingDrizzle);
+    case 61: case 63: case 65: return Lang::t(LangId::WeatherShortRain);
+    case 66: case 67: return Lang::t(LangId::WeatherShortFreezingRain);
+    case 71: case 73: case 75: return Lang::t(LangId::WeatherShortSnow);
+    case 77: return Lang::t(LangId::WeatherShortSnowGrains);
+    case 80: case 81: case 82: return Lang::t(LangId::WeatherShortShowers);
+    case 85: case 86: return Lang::t(LangId::WeatherShortSnowShowers);
+    case 95: case 96: case 99: return Lang::t(LangId::WeatherShortThunderstorm);
+    default: return Lang::t(LangId::WeatherShortUnknown);
   }
 }
 
@@ -274,17 +275,17 @@ const unsigned char* getWifiIcon() {
   return icon_wifi_1;
 }
 
-// Smer vetru na text
+// Smer vetru na text (v aktualne nastavenem jazyce)
 String getWindDir(int deg) {
-  if (deg < 23) return "S";
-  if (deg < 68) return "SV";
-  if (deg < 113) return "V";
-  if (deg < 158) return "JV";
-  if (deg < 203) return "J";
-  if (deg < 248) return "JZ";
-  if (deg < 293) return "Z";
-  if (deg < 338) return "SZ";
-  return "S";
+  if (deg < 23) return Lang::t(LangId::WindN);
+  if (deg < 68) return Lang::t(LangId::WindNE);
+  if (deg < 113) return Lang::t(LangId::WindE);
+  if (deg < 158) return Lang::t(LangId::WindSE);
+  if (deg < 203) return Lang::t(LangId::WindS);
+  if (deg < 248) return Lang::t(LangId::WindSW);
+  if (deg < 293) return Lang::t(LangId::WindW);
+  if (deg < 338) return Lang::t(LangId::WindNW);
+  return Lang::t(LangId::WindN);
 }
 
 // Ziskani casu s automatickym letnim casem
@@ -407,7 +408,7 @@ void disp1_drawCurrent() {
 
   if (!dataValid) {
     disp1.setFont(u8g2_font_6x10_tf);
-    disp1.drawStr(15, 35, "Nacitam data...");
+    disp1.drawStr(15, 35, Lang::t(LangId::LoadingData));
     disp1.drawStr(20, 50, lastError.c_str());
     return;
   }
@@ -438,11 +439,11 @@ void disp1_drawCurrent() {
 void disp1_drawForecast(int dayIndex) {
   if (!dataValid) {
     disp1.setFont(u8g2_font_6x10_tf);
-    disp1.drawStr(15, 35, "Cekam na data...");
+    disp1.drawStr(15, 35, Lang::t(LangId::WaitingForData));
     return;
   }
 
-  const char* dayName = (dayIndex == 0) ? "ZITRA" : "POZITRI";
+  const char* dayName = (dayIndex == 0) ? Lang::t(LangId::Tomorrow) : Lang::t(LangId::DayAfterTomorrow);
 
   // Nadpis dne - bez banneru, stejny vzhled jako disp2
   disp1.setFont(u8g2_font_7x14B_tf);
@@ -486,7 +487,7 @@ void disp1_drawForecast(int dayIndex) {
 void disp2_drawDetails() {
   if (!dataValid) {
     disp2.setFont(u8g2_font_6x10_tf);
-    disp2.drawStr(30, 35, "Nacitam...");
+    disp2.drawStr(30, 35, Lang::t(LangId::Loading));
     return;
   }
 
@@ -502,7 +503,7 @@ void disp2_drawDetails() {
 
   // Vlhkost
   disp2.setFont(u8g2_font_6x10_tf);
-  disp2.drawStr(8, 28, "Vlhkost:");
+  disp2.drawStr(8, 28, Lang::t(LangId::Humidity));
   disp2.setFont(u8g2_font_7x14B_tf);
   disp2.setCursor(70, 30);
   disp2.print((int)humidity);
@@ -511,7 +512,7 @@ void disp2_drawDetails() {
   // Vitr
   disp2.drawXBMP(8, 34, 16, 10, icon_wind);
   disp2.setFont(u8g2_font_6x10_tf);
-  disp2.drawStr(28, 44, "Vitr:");
+  disp2.drawStr(28, 44, Lang::t(LangId::Wind));
   disp2.setFont(u8g2_font_7x14B_tf);
   disp2.setCursor(60, 46);
   disp2.print((int)windSpeed);
@@ -522,7 +523,7 @@ void disp2_drawDetails() {
   // Srazky
   disp2.drawXBMP(8, 50, 8, 12, icon_drop);
   disp2.setFont(u8g2_font_6x10_tf);
-  disp2.drawStr(20, 60, "Srazky:");
+  disp2.drawStr(20, 60, Lang::t(LangId::Precipitation));
   disp2.setFont(u8g2_font_7x14B_tf);
   disp2.setCursor(70, 62);
   disp2.print(precipProb);
@@ -532,11 +533,11 @@ void disp2_drawDetails() {
 void disp2_drawForecast(int dayIndex) {
   if (!dataValid) {
     disp2.setFont(u8g2_font_6x10_tf);
-    disp2.drawStr(30, 35, "Nacitam...");
+    disp2.drawStr(30, 35, Lang::t(LangId::Loading));
     return;
   }
 
-  const char* dayName = (dayIndex == 0) ? "ZITRA" : "POZITRI";
+  const char* dayName = (dayIndex == 0) ? Lang::t(LangId::Tomorrow) : Lang::t(LangId::DayAfterTomorrow);
 
   // Nadpis dne - stejne jako disp1
   disp2.setFont(u8g2_font_7x14B_tf);
@@ -635,14 +636,15 @@ void setup() {
   OtaManager::setStatusCallback(otaStatusCallback);
   OtaManager::begin();
   LocationConfig::begin();
+  Lang::begin();
 
   // Uvodni obrazovka - Displej 1
   disp1.clearBuffer();
   disp1.drawRFrame(0, 0, 128, 64, 4);
   disp1.drawXBMP(8, 18, 24, 24, icon_sun);
   disp1.setFont(u8g2_font_7x14B_tf);
-  disp1.drawStr(40, 26, "METEO");
-  disp1.drawStr(40, 42, "STANICE");
+  disp1.drawStr(40, 26, Lang::t(LangId::MeteoLine1));
+  disp1.drawStr(40, 42, Lang::t(LangId::MeteoLine2));
   disp1.setFont(u8g2_font_6x10_tf);
   disp1.drawStr(48, 58, LocationConfig::name().c_str());
   disp1.sendBuffer();
@@ -651,10 +653,12 @@ void setup() {
   disp2.clearBuffer();
   disp2.drawRFrame(0, 0, 128, 64, 4);
   disp2.setFont(u8g2_font_6x10_tf);
-  disp2.drawStr(25, 25, "Sekundarni");
-  disp2.drawStr(35, 40, "displej");
+  disp2.drawStr(25, 25, Lang::t(LangId::SecondaryDisplay1));
+  disp2.drawStr(35, 40, Lang::t(LangId::SecondaryDisplay2));
   disp2.setFont(u8g2_font_5x7_tf);
-  disp2.drawStr(30, 55, "verze " FIRMWARE_VERSION);
+  disp2.setCursor(30, 55);
+  disp2.print(Lang::t(LangId::VersionPrefix));
+  disp2.print(" " FIRMWARE_VERSION);
   disp2.sendBuffer();
 
   delay(DOUBLE_RESET_WINDOW_MS); // zaroven "okno" pro pripadny druhy RESET, viz vyse
@@ -665,7 +669,7 @@ void setup() {
   disp1.clearBuffer();
   disp1.drawRFrame(0, 0, 128, 64, 4);
   disp1.setFont(u8g2_font_6x10_tf);
-  disp1.drawStr(10, 28, "Pripojuji WiFi...");
+  disp1.drawStr(10, 28, Lang::t(LangId::ConnectingWifi));
   disp1.drawStr(5, 45, "AP: MeteoStation_AP");
   disp1.sendBuffer();
 
@@ -673,7 +677,7 @@ void setup() {
   disp2.clearBuffer();
   disp2.drawRFrame(0, 0, 128, 64, 4);
   disp2.setFont(u8g2_font_6x10_tf);
-  disp2.drawStr(25, 35, "Cekam na WiFi");
+  disp2.drawStr(25, 35, Lang::t(LangId::WaitingForWifi));
   disp2.sendBuffer();
 
   WiFiManager wm;
@@ -693,15 +697,27 @@ void setup() {
       "placeholder='napr. Rojetin, okres Sumperk'");
   wm.addParameter(&cityParam);
 
+  // Jazyk zobrazeni ("cs"/"en") - viz Lang.h. Prosty textovy vstup misto
+  // rozbaloviho seznamu: stejny, uz overeny mechanismus jako u obce/mesta.
+  String langBefore = String(Lang::code());
+  WiFiManagerParameter langParam(
+      "lang", "Jazyk / Language (cs/en)", langBefore.c_str(), 2,
+      "placeholder='cs'");
+  wm.addParameter(&langParam);
+
   wm.setConfigPortalTimeout(180);
   if (!wm.autoConnect("MeteoStation_AP")) {
     disp1.clearBuffer();
     disp1.setFont(u8g2_font_7x14B_tf);
-    disp1.drawStr(15, 35, "WiFi CHYBA!");
+    disp1.drawStr(15, 35, Lang::t(LangId::WifiError));
     disp1.sendBuffer();
     delay(3000);
     ESP.restart();
   }
+
+  // Zpracovat pripadnou zmenu jazyka JESTE PRED lokalitou, aby uz hlaska
+  // "Hledam lokalitu:" nize pouzila spravny jazyk.
+  Lang::setLanguage(String(langParam.getValue()));
 
   // Zpracovat pripadnou (novou/zmenenou) lokalitu. Pri bezne uspesnem
   // pripojeni s jiz ulozenymi udaji se portal vubec nemusi zobrazit -
@@ -713,7 +729,7 @@ void setup() {
     disp1.clearBuffer();
     disp1.drawRFrame(0, 0, 128, 64, 4);
     disp1.setFont(u8g2_font_6x10_tf);
-    disp1.drawStr(10, 28, "Hledam lokalitu:");
+    disp1.drawStr(10, 28, Lang::t(LangId::SearchingLocation));
     disp1.drawStr(10, 45, cityAfter.c_str());
     disp1.sendBuffer();
 
@@ -732,7 +748,7 @@ void setup() {
   disp1.clearBuffer();
   disp1.drawRFrame(0, 0, 128, 64, 4);
   disp1.setFont(u8g2_font_7x14B_tf);
-  disp1.drawStr(15, 28, "PRIPOJENO!");
+  disp1.drawStr(15, 28, Lang::t(LangId::Connected));
   disp1.setFont(u8g2_font_6x10_tf);
   disp1.setCursor(20, 48);
   disp1.print(WiFi.localIP());
@@ -742,7 +758,7 @@ void setup() {
   disp2.clearBuffer();
   disp2.drawRFrame(0, 0, 128, 64, 4);
   disp2.setFont(u8g2_font_6x10_tf);
-  disp2.drawStr(35, 30, "WiFi OK!");
+  disp2.drawStr(35, 30, Lang::t(LangId::WifiOk));
   disp2.setCursor(25, 48);
   disp2.print("RSSI: ");
   disp2.print(WiFi.RSSI());

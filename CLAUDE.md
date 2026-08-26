@@ -113,6 +113,26 @@ re-fetches every boot. On failure (typo, no network) the previous or default (`R
 location is kept — never blocks boot. Duplicated into `factory-sw/` for the same reason as the OTA
 client (see below); keep both copies in sync.
 
+The U8g2 fonts used (`6x10`/`7x14B`/`5x7`) render Czech čárka letters (á,é,í,ó,ú,ý) but not
+háček/kroužek ones (č,ď,ě,ň,ř,š,ť,ů,ž) — confirmed by directly linking `u8g2_font.c`/`u8g2_fonts.c`
+against a host test harness and calling `u8g2_IsGlyph()` across all ~1930 bundled fonts, not by
+guessing; the smallest font that covers all of them is `unifont_t_extended` at 16x16px, too big for
+this layout. So the customer-entered name goes to the geocoding query *with* diacritics (better match
+accuracy) but `geocodeAndSave()` runs it through `stripDiacritics()` (byte-level UTF-8 table, tested
+in `tests/test_strip_diacritics.cpp`) before storing — `LocationConfig::name()` is always
+display-safe ASCII.
+
+### Language subsystem (`Lang.h/.cpp`)
+
+Display language (Czech default / English) is a third WiFiManager portal field alongside WiFi and
+city, persisted to `/config/language.json` the same way. `LangId` is an enum covering every
+user-facing display string (weather conditions long/short form, wind direction letters, and the
+fixed screen text in both `.ino` files); `Lang::t(id)` returns the string in the current language
+from one of two parallel `const char*` arrays whose length is checked against the enum at compile
+time via `static_assert`. All English strings are ASCII-only too, for the same font reason as above.
+Serial diagnostic logging is Czech-only regardless of this setting (out of scope — customer-facing
+display text only). Duplicated into `factory-sw/` like the other shared modules.
+
 ### OTA subsystem (`Ota*.h/.cpp`, `Sha256.h/.cpp`)
 
 Firmware self-updates from GitHub Releases; GitHub Actions is only used to *build and publish* those
