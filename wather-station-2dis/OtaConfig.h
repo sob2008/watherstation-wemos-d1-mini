@@ -10,7 +10,7 @@
 
 // Zvysujte pri kazde zmene, kterou chcete distribuovat pres OTA.
 // Pouziva se Semantic Versioning (MAJOR.MINOR.PATCH), viz OtaVersion.h.
-#define FIRMWARE_VERSION "1.0.5"
+#define FIRMWARE_VERSION "1.0.6"
 
 // Identifikuje HW/SW variantu tohoto firmware. OTA odmitne nainstalovat
 // release, jehoz firmware.json obsahuje jiny "target" (viz README, sekce
