@@ -148,35 +148,34 @@ POZOR: Nepouzivejte D8 (GPIO15) - ma pull-down rezistor a zpusobuje problemy!
                        5. KONFIGURACE POLOHY
 ================================================================================
 
-V kodu na zacatku souboru najdete sekci KONFIGURACE:
+Poloha se NEnastavuje v kodu - kazde zarizeni ji ma jinou, zadava se primo
+na zarizeni pri prvnim pripojeni k WiFi:
 
-// --- KONFIGURACE ---
-const char* LOCATION_NAME = "ROJETIN";  // Nazev lokality na displeji
-const float LAT = 49.36;  // Zemepisna sirka
-const float LON = 16.26;  // Zemepisna delka
-const char* TIMEZONE = "CET-1CEST,M3.5.0,M10.5.0/3";
+1. Pri prvnim zapnuti (nebo po dvojitem stisku RESET tlacitka behem cca 2
+   sekund - viz nize) zarizeni vytvori WiFi sit "MeteoStation_AP".
+2. Pripojte se na ni telefonem/pocitacem, v prohlizeci se otevre (nebo
+   rucne otevrete) stranka 192.168.4.1.
+3. Kromě vyberu domaci WiFi site tam je i pole "Vase obec/mesto" - napiste
+   nazev sve obce (napr. "Rojetin", pripadne s upresnenim jako "Rojetin,
+   okres Sumperk", pokud existuje vic stejnojmennych obci).
+4. Po ulozeni se zarizeni pripoji k WiFi a samo dohleda souradnice pres
+   Open-Meteo Geocoding API (stejna sluzba, ktera dodava i data o pocasi).
+   Vysledek (nazev + souradnice) se ulozi trvale do pameti zarizeni.
 
-LOCATION_NAME - Nazev vasi lokality, ktery se zobrazi na displeji
-                (v banneru a na uvodni obrazovce)
-LAT           - Zemepisna sirka pro stahovani dat o pocasi
-LON           - Zemepisna delka pro stahovani dat o pocasi
+Pokud se lokalita nepodari dohledat (preklep, neexistujici nazev, vypadek
+site), zarizeni pokracuje s predchozi/vychozi lokalitou a nic se nerozbije -
+lze to kdykoliv opravit postupem nize.
 
-Jak zjistit souradnice sve lokality:
-1. Otevrete Google Maps (maps.google.com)
-2. Najdete svou lokaci
-3. Kliknete pravym tlacitkem na misto
-4. Souradnice se zobrazi v menu (napr. 49.3612, 16.2584)
-5. Prvni cislo = LAT (sirka), druhe = LON (delka)
-
-Priklady konfigurace:
-- Praha:      LOCATION_NAME = "PRAHA",    LAT = 50.08, LON = 14.42
-- Brno:       LOCATION_NAME = "BRNO",     LAT = 49.19, LON = 16.61
-- Ostrava:    LOCATION_NAME = "OSTRAVA",  LAT = 49.82, LON = 18.26
-- Plzen:      LOCATION_NAME = "PLZEN",    LAT = 49.74, LON = 13.38
+ZMENA POLOHY (nebo WiFi) POZDEJI:
+Rychle 2x za sebou stisknete fyzicke RESET tlacitko na desce (do ~2 sekund
+od predchoziho zapnuti/resetu). Zarizeni smaze ulozene WiFi a znovu otevre
+konfiguracni portal popsany vyse - pole pro obec bude predvyplnene aktualni
+hodnotou, staci opravit jen to, co je spatne.
 
 Casova zona:
-Pro Ceskou republiku nechte: "CET-1CEST,M3.5.0,M10.5.0/3"
-Toto zajisti automaticky prechod na letni/zimni cas.
+"TIMEZONE" v kodu zustava spolecna pro vsechna zarizeni (predpoklada se
+prodej v CR): "CET-1CEST,M3.5.0,M10.5.0/3" zajisti automaticky prechod na
+letni/zimni cas.
 
 ================================================================================
                       6. INSTALACE A NAHRANI
@@ -205,8 +204,10 @@ Prvni spusteni:
 2. Pokud neni ulozena WiFi sit, vytvori pristupovy bod "MeteoStation_AP"
 3. Pripojte se k teto siti telefonem nebo PC
 4. Otevrete prohlizec a jdete na 192.168.4.1
-5. Vyberte svou WiFi sit a zadejte heslo
-6. ESP8266 se pripoji a zacne zobrazovat pocasi
+5. Vyberte svou WiFi sit, zadejte heslo a vyplnte i pole "Vase obec/mesto"
+   (viz sekce 5 - KONFIGURACE POLOHY)
+6. ESP8266 se pripoji, dohleda si souradnice zadane obce a zacne zobrazovat
+   pocasi
 
 Zobrazovane obrazovky (1 displej):
 1. Aktualni teplota s ikonkou a popisem
@@ -253,10 +254,12 @@ Reseni:
 - Kazdy displej MUSI mit vlastni RESET pin (ne jen CS)
 - Zkontrolujte ze D1=RST1, D4=RST2
 
-Problem: WiFi se nepripojuje
+Problem: WiFi se nepripojuje / chci zmenit WiFi nebo obec
 Reseni:
-- Podrzenim tlacitka RESET na 10s se smaze konfigurace
-- Pripojte se k AP "MeteoStation_AP" a nastavte znovu
+- Rychle 2x za sebou stisknete tlacitko RESET (do ~2 sekund) - smaze se
+  ulozena WiFi a znovu se otevre konfiguracni portal
+- Pripojte se k AP "MeteoStation_AP" a nastavte znovu (pole pro obec bude
+  predvyplnene aktualni hodnotou)
 
 Problem: Zobrazuje se 0.0 stupnu
 Reseni:

@@ -18,10 +18,11 @@ that is not present in this checkout — don't assume it exists without checking
 There is a second, separate sketch: `factory-sw/factory-sw.ino` — a minimal provisioning firmware
 flashed onto new/refurbished units via USB before shipping. It walks the customer through WiFi setup
 then immediately installs the latest `wather-station-2dis` release via OTA and reboots into it; see
-`factory-sw/README.md`. It duplicates the OTA client files (`Ota*.h/.cpp`, `Sha256.h/.cpp`) from
-`wather-station-2dis/` because Arduino compiles each sketch folder independently — **if you fix or
-change OTA client logic in `wather-station-2dis/`, copy the same change into `factory-sw/`** (but not
-`OtaConfig.h`, which is deliberately different between the two — see that file's own comments).
+`factory-sw/README.md`. It duplicates the OTA client files (`Ota*.h/.cpp`, `Sha256.h/.cpp`) and the location module
+(`LocationConfig.h/.cpp`) from `wather-station-2dis/` because Arduino compiles each sketch folder
+independently — **if you fix or change OTA client or location logic in `wather-station-2dis/`, copy
+the same change into `factory-sw/`** (but not `OtaConfig.h`, which is deliberately different between
+the two — see that file's own comments).
 
 ## Build / test commands
 
@@ -57,9 +58,10 @@ only runs on an explicit `vX.Y.Z` tag push, never on a plain push to `main`.
 
 ### Weather station (`wather-station-2dis.ino`)
 
-**Location config** (`LOCATION_NAME`, `LAT`, `LON`, `TIMEZONE`) lives as plain constants near the top of
-the file. Together with `OtaConfig.h` (see below), these are the things a user is expected to edit
-before flashing.
+**Location** (`LOCATION_NAME`/`LAT`/`LON` equivalent) is *not* compile-time config — each customer
+has a different one, entered at runtime via a custom field in the WiFiManager portal and resolved to
+coordinates through the Open-Meteo Geocoding API; see "Location subsystem" below. `TIMEZONE` (a plain
+constant near the top of the file) and `OtaConfig.h` are the only things still edited before flashing.
 
 **Two independent SH1106 displays** driven over a shared software SPI bus (CLK=D5, DATA=D7, DC=D3),
 but each display has its **own CS and RESET pin** (disp1: CS=D2/RST=D1, disp2: CS=D6/RST=D4) — this is
@@ -90,7 +92,26 @@ delay per loop iteration. NTP/timezone sync (`configTime` with the POSIX TZ stri
 CEST/CET DST) happens once in `setup()`.
 
 **WiFi provisioning** uses `WiFiManager` with AP name `MeteoStation_AP` and a 180s config portal
-timeout; on failure the device shows an error on disp1 and calls `ESP.restart()`.
+timeout; on failure the device shows an error on disp1 and calls `ESP.restart()`. The same portal
+carries one extra field (a `WiFiManagerParameter`) for the customer's town/city — see "Location
+subsystem". A double physical RESET within `DOUBLE_RESET_WINDOW_MS` (~2s, detected via ESP8266 RTC
+memory, `checkDoubleReset()`/`clearDoubleResetMarker()` in the `.ino`) calls `wm.resetSettings()` to
+reopen the portal later, e.g. if the customer moves or mistypes their town.
+
+### Location subsystem (`LocationConfig.h/.cpp`)
+
+Per-customer location (name + lat/lon) is no longer compile-time config. It's entered as a plain
+town/city name into the WiFiManager portal's custom field, then `LocationConfig::geocodeAndSave()`
+resolves it via the Open-Meteo Geocoding API (`geocoding-api.open-meteo.com`, same provider as the
+weather API — no new dependency) and persists it to LittleFS at `/config/location.json`
+(write-temp-then-rename, same pattern as `OtaState`). `LocationConfig::name()`/`lat()`/`lon()` are
+what `updateWeather()` and the display headers read instead of the old `LOCATION_NAME`/`LAT`/`LON`
+constants; `name()` returns `const String&` (not a copy) since it's called on every display redraw.
+Geocoding only runs when the submitted value differs from what's already stored — on a normal boot
+(saved WiFi credentials, portal never shown) the field just echoes the stored value back, so nothing
+re-fetches every boot. On failure (typo, no network) the previous or default (`ROJETIN`, 49.36/16.26)
+location is kept — never blocks boot. Duplicated into `factory-sw/` for the same reason as the OTA
+client (see below); keep both copies in sync.
 
 ### OTA subsystem (`Ota*.h/.cpp`, `Sha256.h/.cpp`)
 

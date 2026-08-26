@@ -24,6 +24,7 @@
 #include "OtaConfig.h"
 #include "OtaState.h"
 #include "OtaManager.h"
+#include "LocationConfig.h"
 
 // Piny - stejne jako ostry firmware (wather-station-2dis), tovarni SW bezi
 // na identickem hardwaru. Kazdy displej ma vlastni CS a RESET, viz
@@ -90,28 +91,37 @@ void setup() {
   showSecondary("Vitejte!", "Chvilku strpeni");
   delay(2000);
 
-  // LittleFS + perzistentni OTA stav. Na zcela novem/prave smazanem
-  // zarizeni (flash.py/flash.sh delaji plny erase_flash pred zapisem) je
-  // tohle vzdy cisty start - viz README v tomto adresari.
+  // LittleFS + perzistentni OTA stav a lokalita. Na zcela novem/prave
+  // smazanem zarizeni (flash.py/flash.sh delaji plny erase_flash pred
+  // zapisem) je tohle vzdy cisty start - viz README v tomto adresari.
   OtaState::begin();
   OtaManager::setStatusCallback(otaStatusCallback);
   OtaManager::begin();
+  LocationConfig::begin();
 
   // --- Instrukce pro zakaznika ---
   Serial.println("KROK 1: Pripojte se telefonem nebo pocitacem na WiFi sit:");
   Serial.println("        MeteoStation_AP");
   Serial.println("        Pak v prohlizeci otevrete: 192.168.4.1");
-  Serial.println("        a vyberte vasi domaci WiFi sit.");
+  Serial.println("        a vyberte vasi domaci WiFi sit + zadejte obec/mesto.");
   Serial.println();
 
   showStatus("KROK 1/2", "Pripojte se na WiFi:", "MeteoStation_AP");
-  showSecondary("Pak otevrete", "192.168.4.1");
+  showSecondary("Pak zadejte", "WiFi + obec");
 
   // Stejny vzor jako wather-station-2dis.ino: pri vyprseni portalu radeji
   // cely ESP restartuje, nez aby se autoConnect() volalo znovu na tomtez
   // WiFiManager objektu - to je overene chovani, opakovane volani na jiz
   // pouzitem WiFiManager instance overene neni.
   WiFiManager wm;
+
+  // Vlastni pole v portalu pro obec/mesto zakaznika - viz LocationConfig.h.
+  String cityBefore = LocationConfig::name();
+  WiFiManagerParameter cityParam(
+      "city", "Vase obec/mesto", cityBefore.c_str(), 40,
+      "placeholder='napr. Rojetin, okres Sumperk'");
+  wm.addParameter(&cityParam);
+
   wm.setConfigPortalTimeout(180);
   if (!wm.autoConnect("MeteoStation_AP")) {
     Serial.println("Konfiguracni portal WiFi vyprsel (180s), restartuji...");
@@ -127,6 +137,26 @@ void setup() {
   showStatus("WIFI PRIPOJENO", WiFi.localIP().toString().c_str(), "");
   showSecondary("Pripojeno!", "");
   delay(1500);
+
+  // Zpracovat zadanou lokalitu.
+  String cityAfter = String(cityParam.getValue());
+  cityAfter.trim();
+  if (cityAfter.length() > 0 && cityAfter != cityBefore) {
+    Serial.print("Zadana lokalita: ");
+    Serial.println(cityAfter);
+
+    showStatus("LOKALITA", "Hledam:", cityAfter.c_str());
+
+    if (!LocationConfig::geocodeAndSave(cityAfter)) {
+      Serial.println("Lokalitu se nepodarilo najit, pouziva se vychozi - zakaznik ji");
+      Serial.println("muze pozdeji zmenit dvojitym RESETem na ostrem firmware.");
+      showStatus("LOKALITA", "Nenalezena,", "pouzivam vychozi");
+      delay(1500);
+    } else {
+      showStatus("LOKALITA", "Nalezena:", LocationConfig::name().c_str());
+      delay(1000);
+    }
+  }
 
   Serial.println("KROK 2: Stahuji a instaluji aktualni verzi softwaru...");
   Serial.println("        (podrobny prubeh viz [OTA] hlasky nize)");

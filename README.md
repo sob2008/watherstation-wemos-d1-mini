@@ -21,6 +21,27 @@ Sketch se vyvíjí a nahrává přes Arduino IDE (žádný PlatformIO):
   (tzapu), `NTPClient`
 - Serial Monitor: 115200 baud - veškerá diagnostika (WiFi, HTTP, OTA) se loguje sem
 
+## Nastavení lokality (`LocationConfig`)
+
+Poloha už není pevně v kódu - každý zákazník ji zadává sám. Do stejného WiFiManager
+formuláře (`MeteoStation_AP` → 192.168.4.1), kde se zadává WiFi, přibylo pole
+"Vaše obec/město". Zařízení podle něj po připojení k WiFi samo dohledá souřadnice
+přes **Open-Meteo Geocoding API** (stejný poskytovatel jako počasí) a uloží si to
+trvale do LittleFS (`/config/location.json`, přežije i OTA aktualizace). Modul
+[`LocationConfig.h/.cpp`](wather-station-2dis/LocationConfig.h) je - stejně jako OTA
+klient - zkopírovaný i do `factory-sw/`, ze stejného důvodu (Arduino kompiluje
+sketch složky zvlášť).
+
+Pozdější změna (přestěhování, překlep): rychlý **dvojitý stisk fyzického RESET
+tlačítka** (do ~2 s) smaže uloženou WiFi a znovu otevře portál s polem pro obec
+předvyplněným aktuální hodnotou. Detekce běží přes RTC paměť ESP8266 (žádná nová
+knihovna) - viz `checkDoubleReset()`/`clearDoubleResetMarker()` v `.ino`.
+
+Pokud geokódování selže (překlep, výpadek sítě), zařízení pokračuje s předchozí
+nebo výchozí lokalitou (`ROJETIN`, 49.36/16.26) - nikdy se kvůli tomu nezablokuje.
+Podrobný zákaznický popis je v [`wather-station-2dis/DOKUMENTACE.txt`](wather-station-2dis/DOKUMENTACE.txt),
+sekce 5.
+
 ## OTA aktualizace přes GitHub Releases
 
 ### Jak to funguje (přehled)

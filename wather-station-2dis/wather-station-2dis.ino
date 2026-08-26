@@ -11,11 +11,12 @@
 #include "OtaConfig.h"
 #include "OtaState.h"
 #include "OtaManager.h"
+#include "LocationConfig.h"
 
 // --- KONFIGURACE ---
-const char* LOCATION_NAME = "ROJETIN";  // Nazev lokality na displeji
-const float LAT = 49.36;  // Zemente na svou zemepisnou sirku
-const float LON = 16.26;  // Zemente na svou zemepisnou delku
+// LOCATION_NAME/LAT/LON uz nejsou pevne v kodu - kazdy zakaznik ma jinou
+// lokalitu. Zadava se jako nazev obce ve WiFiManager portalu (viz setup()),
+// odtud se preklada na souradnice a trvale uklada v LocationConfig.
 const char* TIMEZONE = "CET-1CEST,M3.5.0,M10.5.0/3"; // Automaticky letni cas
 
 // === IKONKY POCASI 24x24 px - XBM format (LSB first) ===
@@ -315,8 +316,8 @@ void updateWeather() {
   client->setInsecure();
   HTTPClient http;
 
-  String url = "https://api.open-meteo.com/v1/forecast?latitude=" + String(LAT) +
-               "&longitude=" + String(LON) +
+  String url = "https://api.open-meteo.com/v1/forecast?latitude=" + String(LocationConfig::lat(), 4) +
+               "&longitude=" + String(LocationConfig::lon(), 4) +
                "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m" +
                "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max" +
                "&timezone=auto&forecast_days=3";
@@ -393,7 +394,7 @@ void updateWeather() {
 
 void disp1_drawHeader() {
   disp1.setFont(u8g2_font_7x14B_tf);
-  disp1.drawStr(0, 12, LOCATION_NAME);
+  disp1.drawStr(0, 12, LocationConfig::name().c_str());
 
   disp1.setFont(u8g2_font_6x10_tf);
   disp1.drawStr(85, 12, getLocalTime().c_str());
@@ -574,9 +575,45 @@ void disp2_drawForecast(int dayIndex) {
   disp2.print("%");
 }
 
+// ========== DVOJITY RESET (zmena WiFi/lokality zakaznikem) ==========
+//
+// Rychle 2x za sebou zmacknute fyzicke RESET tlacitko (do DOUBLE_RESET_WINDOW_MS
+// od predchoziho bootu) znovu otevre konfiguracni portal. Vyuziva RTC pamet
+// ESP8266 (prezije normalni reset, na rozdil od beznych promennych) - zadna
+// dalsi knihovna neni potreba.
+//
+// Princip: pri kazdem bootu se do RTC pameti hned zapise "marker" a po
+// DOUBLE_RESET_WINDOW_MS se zase smaze. Pokud pri PRISTIM bootu marker jeste
+// je nastaveny, znamena to, ze k restartu doslo behem tohoto okna - tedy
+// driv, nez stihl predchozi beh marker sam smazat.
+#define DOUBLE_RESET_MAGIC 0xD2D2D2D2UL
+#define DOUBLE_RESET_WINDOW_MS 2000UL
+
+bool checkDoubleReset() {
+  uint32_t marker = 0;
+  ESP.rtcUserMemoryRead(0, &marker, sizeof(marker));
+  bool isDouble = (marker == DOUBLE_RESET_MAGIC);
+
+  uint32_t setMarker = DOUBLE_RESET_MAGIC;
+  ESP.rtcUserMemoryWrite(0, &setMarker, sizeof(setMarker));
+
+  return isDouble;
+}
+
+void clearDoubleResetMarker() {
+  uint32_t clearMarker = 0;
+  ESP.rtcUserMemoryWrite(0, &clearMarker, sizeof(clearMarker));
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("\n\n=== Meteostanice 2-Display ===");
+
+  // Dvojity fyzicky reset (2x RESET tlacitko behem par sekund) = zakaznik
+  // chce znovu otevrit konfiguracni portal (zmena WiFi a/nebo lokality).
+  // Marker se ulozi hned, a smaze az po ubehnuti "okna" nize (viz
+  // checkDoubleReset()/clearDoubleResetMarker()).
+  bool doubleReset = checkDoubleReset();
 
   // Inicializace displeje 1
   Serial.println("Init displej 1...");
@@ -590,6 +627,15 @@ void setup() {
 
   Serial.println("Oba displeje inicializovany");
 
+  // OTA + lokalita: LittleFS musi byt pripojeny driv, nez cokoliv
+  // zobrazime (uvodni obrazovka uz chce znat nazev lokality) a driv, nez
+  // se pripojuje WiFi (OTA rollback rozhodnuti nesmi zavist na siti, viz
+  // README, sekce OTA).
+  OtaState::begin();
+  OtaManager::setStatusCallback(otaStatusCallback);
+  OtaManager::begin();
+  LocationConfig::begin();
+
   // Uvodni obrazovka - Displej 1
   disp1.clearBuffer();
   disp1.drawRFrame(0, 0, 128, 64, 4);
@@ -598,7 +644,7 @@ void setup() {
   disp1.drawStr(40, 26, "METEO");
   disp1.drawStr(40, 42, "STANICE");
   disp1.setFont(u8g2_font_6x10_tf);
-  disp1.drawStr(48, 58, LOCATION_NAME);
+  disp1.drawStr(48, 58, LocationConfig::name().c_str());
   disp1.sendBuffer();
 
   // Uvodni obrazovka - Displej 2
@@ -611,16 +657,11 @@ void setup() {
   disp2.drawStr(30, 55, "verze " FIRMWARE_VERSION);
   disp2.sendBuffer();
 
-  delay(2000);
+  delay(DOUBLE_RESET_WINDOW_MS); // zaroven "okno" pro pripadny druhy RESET, viz vyse
 
-  // OTA: pripojit LittleFS, nacist perzistentni stav a rozhodnout o
-  // pripadnem rollbacku na predchozi firmware - vse PRED pripojenim WiFi,
-  // aby rollback nezavisel na siti (viz README, sekce OTA).
-  OtaState::begin();
-  OtaManager::setStatusCallback(otaStatusCallback);
-  OtaManager::begin();
+  clearDoubleResetMarker();
 
-  // WiFi pripojeni - Displej 1
+  // WiFi (+ lokalita) pripojeni - Displej 1
   disp1.clearBuffer();
   disp1.drawRFrame(0, 0, 128, 64, 4);
   disp1.setFont(u8g2_font_6x10_tf);
@@ -636,6 +677,22 @@ void setup() {
   disp2.sendBuffer();
 
   WiFiManager wm;
+
+  if (doubleReset) {
+    Serial.println("Dvojity RESET detekovan - mazu ulozene WiFi, otevirám konfiguraci znovu");
+    wm.resetSettings();
+  }
+
+  // Vlastni pole ve WiFiManager portalu pro obec/mesto zakaznika -
+  // predvyplnene aktualni hodnotou (takze pri oprave preklepu staci
+  // upravit, ne psat znovu cele). Zpracovano az po uspesnem pripojeni,
+  // viz nize.
+  String cityBefore = LocationConfig::name();
+  WiFiManagerParameter cityParam(
+      "city", "Vase obec/mesto", cityBefore.c_str(), 40,
+      "placeholder='napr. Rojetin, okres Sumperk'");
+  wm.addParameter(&cityParam);
+
   wm.setConfigPortalTimeout(180);
   if (!wm.autoConnect("MeteoStation_AP")) {
     disp1.clearBuffer();
@@ -644,6 +701,28 @@ void setup() {
     disp1.sendBuffer();
     delay(3000);
     ESP.restart();
+  }
+
+  // Zpracovat pripadnou (novou/zmenenou) lokalitu. Pri bezne uspesnem
+  // pripojeni s jiz ulozenymi udaji se portal vubec nemusi zobrazit -
+  // cityParam pak jen vraci puvodni predvyplnenou hodnotu, proto se
+  // geokoduje jen pri skutecne zmene, ne pri kazdem bootu.
+  String cityAfter = String(cityParam.getValue());
+  cityAfter.trim();
+  if (cityAfter.length() > 0 && cityAfter != cityBefore) {
+    disp1.clearBuffer();
+    disp1.drawRFrame(0, 0, 128, 64, 4);
+    disp1.setFont(u8g2_font_6x10_tf);
+    disp1.drawStr(10, 28, "Hledam lokalitu:");
+    disp1.drawStr(10, 45, cityAfter.c_str());
+    disp1.sendBuffer();
+
+    Serial.print("Zadana lokalita: ");
+    Serial.println(cityAfter);
+
+    if (!LocationConfig::geocodeAndSave(cityAfter)) {
+      Serial.println("Lokalitu se nepodarilo najit, pouzivam predchozi/vychozi.");
+    }
   }
 
   // Nastaveni casove zony pro automaticky letni cas
